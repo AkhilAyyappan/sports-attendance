@@ -1,0 +1,369 @@
+### Sports Camp Attendance System — API Test Requests
+### Use with VS Code REST Client extension, IntelliJ HTTP Client, or import into Postman.
+###
+### Prerequisites:
+###   - App running on http://localhost:8080
+###   - PostgreSQL running with database 'sports_attendance'
+###   - Seed data applied (V2 migration): admin / admin123
+###
+### Set these variables once and reuse:
+
+@base = http://localhost:8080
+@adminAuth = admin:admin123
+@captainAuth = captain1:captain123
+
+# ─────────────────────────────────────────────
+# HEALTH CHECK
+# ─────────────────────────────────────────────
+
+### 1. Health endpoint (no auth required)
+GET {{base}}/actuator/health
+
+
+# ─────────────────────────────────────────────
+# SPORTS
+# ─────────────────────────────────────────────
+
+### 2. List all sports
+GET {{base}}/api/sports
+Authorization: Basic {{adminAuth}}
+
+### 3. List active sports only
+GET {{base}}/api/sports/active
+Authorization: Basic {{adminAuth}}
+
+### 4. Create a sport (admin only)
+POST {{base}}/api/sports
+Authorization: Basic {{adminAuth}}
+Content-Type: application/json
+
+{
+  "name": "Swimming",
+  "description": "Competitive swimming training",
+  "active": true
+}
+
+### 5. Update a sport
+PUT {{base}}/api/sports/1
+Authorization: Basic {{adminAuth}}
+Content-Type: application/json
+
+{
+  "name": "Football",
+  "description": "Updated description",
+  "active": true
+}
+
+
+# ─────────────────────────────────────────────
+# CAMPS
+# ─────────────────────────────────────────────
+
+### 6. List all camps
+GET {{base}}/api/camps
+Authorization: Basic {{adminAuth}}
+
+### 7. Get camp by ID
+GET {{base}}/api/camps/1
+Authorization: Basic {{adminAuth}}
+
+### 8. Create a camp
+POST {{base}}/api/camps
+Authorization: Basic {{adminAuth}}
+Content-Type: application/json
+
+{
+  "name": "Winter Sprint Camp 2025",
+  "description": "Off-season sprint training",
+  "startDate": "2025-12-01",
+  "endDate": "2025-12-20",
+  "location": "City Stadium",
+  "status": "UPCOMING"
+}
+
+### 9. Update a camp
+PUT {{base}}/api/camps/1
+Authorization: Basic {{adminAuth}}
+Content-Type: application/json
+
+{
+  "name": "Summer Elite Camp 2025",
+  "description": "Updated description",
+  "startDate": "2025-06-01",
+  "endDate": "2025-06-30",
+  "location": "National Sports Complex",
+  "status": "ACTIVE"
+}
+
+### 10. Delete a camp
+DELETE {{base}}/api/camps/2
+Authorization: Basic {{adminAuth}}
+
+
+# ─────────────────────────────────────────────
+# USERS / CAPTAINS
+# ─────────────────────────────────────────────
+
+### 11. List all captains
+GET {{base}}/api/users/captains
+Authorization: Basic {{adminAuth}}
+
+### 12. Create a captain account
+POST {{base}}/api/users
+Authorization: Basic {{adminAuth}}
+Content-Type: application/json
+
+{
+  "username": "captain1",
+  "password": "captain123",
+  "fullName": "John Doe",
+  "email": "jdoe@sportscamp.com",
+  "phone": "0700000001",
+  "role": "ROLE_CAPTAIN"
+}
+
+### 13. Reset a captain's password
+PATCH {{base}}/api/users/2/password
+Authorization: Basic {{adminAuth}}
+Content-Type: application/json
+
+{
+  "newPassword": "newpassword456"
+}
+
+### 14. Toggle enable/disable a user
+PATCH {{base}}/api/users/2/toggle
+Authorization: Basic {{adminAuth}}
+
+
+# ─────────────────────────────────────────────
+# TEAMS
+# ─────────────────────────────────────────────
+
+### 15. List teams in camp 1
+GET {{base}}/api/camps/1/teams
+Authorization: Basic {{adminAuth}}
+
+### 16. Create a team in camp 1, sport 1 (Football)
+POST {{base}}/api/camps/1/teams
+Authorization: Basic {{adminAuth}}
+Content-Type: application/json
+
+{
+  "name": "Alpha Squad",
+  "sportId": 1
+}
+
+### 17. Get a single team
+GET {{base}}/api/teams/1
+Authorization: Basic {{adminAuth}}
+
+### 18. Assign captain to team
+POST {{base}}/api/teams/1/captain
+Authorization: Basic {{adminAuth}}
+Content-Type: application/json
+
+{
+  "captainId": 2
+}
+
+### 19. Update team (rename / deactivate)
+PATCH {{base}}/api/teams/1
+Authorization: Basic {{adminAuth}}
+Content-Type: application/json
+
+{
+  "name": "Alpha Squad A",
+  "active": true
+}
+
+
+# ─────────────────────────────────────────────
+# PLAYERS
+# ─────────────────────────────────────────────
+
+### 20. List players in team 1
+GET {{base}}/api/teams/1/players
+Authorization: Basic {{adminAuth}}
+
+### 21. Add a player to team 1
+POST {{base}}/api/teams/1/players
+Authorization: Basic {{adminAuth}}
+Content-Type: application/json
+
+{
+  "fullName": "Ahmed Ali",
+  "dateOfBirth": "2005-03-15",
+  "jerseyNumber": 10,
+  "position": "Forward",
+  "phone": "0700000010",
+  "email": "ahmed@example.com"
+}
+
+### 22. Add a second player to team 1
+POST {{base}}/api/teams/1/players
+Authorization: Basic {{adminAuth}}
+Content-Type: application/json
+
+{
+  "fullName": "Sara Khan",
+  "dateOfBirth": "2006-07-20",
+  "jerseyNumber": 7,
+  "position": "Midfielder"
+}
+
+### 23. Get a player
+GET {{base}}/api/players/1
+Authorization: Basic {{adminAuth}}
+
+### 24. Update a player
+PUT {{base}}/api/players/1
+Authorization: Basic {{adminAuth}}
+Content-Type: application/json
+
+{
+  "fullName": "Ahmed Ali",
+  "dateOfBirth": "2005-03-15",
+  "jerseyNumber": 10,
+  "position": "Striker",
+  "notes": "Strong left foot"
+}
+
+### 25. Deactivate (soft-delete) a player
+DELETE {{base}}/api/players/1
+Authorization: Basic {{adminAuth}}
+
+
+# ─────────────────────────────────────────────
+# TRAINING SESSIONS
+# ─────────────────────────────────────────────
+
+### 26. List all sessions for camp 1
+GET {{base}}/api/camps/1/sessions
+Authorization: Basic {{adminAuth}}
+
+### 27. List sessions for team 1 in camp 1 (team + camp-wide)
+GET {{base}}/api/camps/1/sessions?teamId=1
+Authorization: Basic {{adminAuth}}
+
+### 28. Create a camp-wide session (no teamId)
+POST {{base}}/api/camps/1/sessions
+Authorization: Basic {{adminAuth}}
+Content-Type: application/json
+
+{
+  "title": "Opening Fitness Test",
+  "sessionDate": "2025-06-02",
+  "startTime": "08:00",
+  "endTime": "10:00",
+  "notes": "All teams participate"
+}
+
+### 29. Create a team-specific session
+POST {{base}}/api/camps/1/sessions
+Authorization: Basic {{adminAuth}}
+Content-Type: application/json
+
+{
+  "title": "Alpha Squad Tactics",
+  "sessionDate": "2025-06-03",
+  "startTime": "09:00",
+  "endTime": "11:00",
+  "teamId": 1
+}
+
+### 30. Get a single session
+GET {{base}}/api/sessions/1
+Authorization: Basic {{adminAuth}}
+
+### 31. Update session status
+PATCH {{base}}/api/sessions/1/status
+Authorization: Basic {{adminAuth}}
+Content-Type: application/json
+
+{
+  "status": "COMPLETED"
+}
+
+
+# ─────────────────────────────────────────────
+# ATTENDANCE
+# ─────────────────────────────────────────────
+
+### 32. Get attendance for session 1
+GET {{base}}/api/sessions/1/attendance
+Authorization: Basic {{adminAuth}}
+
+### 33. Submit bulk attendance for session 1 (as captain)
+POST {{base}}/api/sessions/1/attendance
+Authorization: Basic {{captainAuth}}
+Content-Type: application/json
+
+{
+  "records": [
+    { "playerId": 1, "status": "PRESENT" },
+    { "playerId": 2, "status": "ABSENT"  }
+  ]
+}
+
+### 34. Submit attendance as admin
+POST {{base}}/api/sessions/1/attendance
+Authorization: Basic {{adminAuth}}
+Content-Type: application/json
+
+{
+  "records": [
+    { "playerId": 1, "status": "LATE"    },
+    { "playerId": 2, "status": "EXCUSED" }
+  ]
+}
+
+### 35. Update a single attendance record (get ID from #32 response)
+PATCH {{base}}/api/attendance/1
+Authorization: Basic {{adminAuth}}
+Content-Type: application/json
+
+{
+  "status": "EXCUSED",
+  "remarks": "Medical certificate provided"
+}
+
+### 36. Get attendance history for player 1
+GET {{base}}/api/players/1/attendance
+Authorization: Basic {{adminAuth}}
+
+### 37. Get attendance summary (present count) for player 1
+GET {{base}}/api/players/1/attendance/summary
+Authorization: Basic {{adminAuth}}
+
+
+# ─────────────────────────────────────────────
+# ERROR CASES — verify error responses
+# ─────────────────────────────────────────────
+
+### 38. 404 — camp that does not exist
+GET {{base}}/api/camps/99999
+Authorization: Basic {{adminAuth}}
+
+### 39. 409 — duplicate sport name
+POST {{base}}/api/sports
+Authorization: Basic {{adminAuth}}
+Content-Type: application/json
+
+{
+  "name": "Football",
+  "description": "Duplicate"
+}
+
+### 40. 403 — captain trying to create a camp (forbidden)
+POST {{base}}/api/camps
+Authorization: Basic {{captainAuth}}
+Content-Type: application/json
+
+{
+  "name": "Should Fail",
+  "status": "UPCOMING"
+}
+
+### 41. 401 — no credentials at all
+GET {{base}}/api/camps

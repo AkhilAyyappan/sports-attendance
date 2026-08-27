@@ -1,0 +1,24 @@
+spring:
+  datasource:
+    # Transaction pooler — username includes project ref
+    url: 
+    password: 
+
+  flyway:
+    # prepareThreshold=0 disables server-side prepared statements
+    # Required for Supabase PgBouncer pooler in transaction mode
+    url: 
+    password: 
+
+  jpa:
+    show-sql: true
+    hibernate:
+      ddl-auto: validate
+
+  thymeleaf:
+    cache: false
+
+logging:
+  level:
+    com.sportscamp: DEBUG
+    org.springframework.security: DEBUG
