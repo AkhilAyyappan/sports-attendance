@@ -9,8 +9,8 @@
 ### Set these variables once and reuse:
 
 @base = http://localhost:8080
-@adminAuth = admin:admin123
-@captainAuth = captain1:captain123
+@adminAuth = YWRtaW46YWRtaW4xMjM=
+@captainAuth = Y2FwdGFpbjE6Y2FwdGFpbjEyMw==
 
 # ─────────────────────────────────────────────
 # HEALTH CHECK
