@@ -1,11 +1,6 @@
 .env
-sports-attendance/.env
-**/target/
-target/
-.vscode/
-.DS_Store
 sports-attendance/.mvn/wrapper
 sports-attendance/mvnw
-sports-attendance/mvnw.cmd
+C:\Users\akhil\Downloads\sports-attendance\sports-attendance\mvnw.cmd
 .claude
 .idea
