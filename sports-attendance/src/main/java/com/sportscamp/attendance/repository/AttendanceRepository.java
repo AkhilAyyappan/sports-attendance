@@ -13,11 +13,14 @@ import java.util.Optional;
 @Repository
 public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
 
-    List<Attendance> findBySessionId(Long sessionId);
+    @Query("SELECT a FROM Attendance a WHERE a.session.id = :sessionId")
+    List<Attendance> findBySessionId(@Param("sessionId") Long sessionId);
 
-    List<Attendance> findByPlayerId(Long playerId);
+    @Query("SELECT a FROM Attendance a WHERE a.player.id = :playerId")
+    List<Attendance> findByPlayerId(@Param("playerId") Long playerId);
 
-    Optional<Attendance> findByPlayerIdAndSessionId(Long playerId, Long sessionId);
+    @Query("SELECT a FROM Attendance a WHERE a.player.id = :playerId AND a.session.id = :sessionId")
+    Optional<Attendance> findByPlayerIdAndSessionId(@Param("playerId") Long playerId, @Param("sessionId") Long sessionId);
 
     @Query("""
             SELECT a FROM Attendance a
