@@ -2,10 +2,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/api/client'
 import { type Sport } from '@/types'
 
-export function useSports() {
+export function useSports(enabled: boolean = true) {
   return useQuery({
     queryKey: ['sports'],
     queryFn: () => api.get('/api/sports').then((r) => r.data as Sport[]),
+    enabled,
   })
 }
 

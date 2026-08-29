@@ -40,7 +40,7 @@ import {
 } from '@/hooks'
 import { type AttendanceStatus } from '@/types/attendance'
 import { type Session } from '@/types'
-import { Trophy, Calendar, Plus, Trash2 } from 'lucide-react'
+import { Trophy, Calendar, Plus, Trash2, Sun, Moon } from 'lucide-react'
 
 const STATUS_OPTIONS: AttendanceStatus[] = ['PRESENT', 'LATE', 'ABSENT', 'EXCUSED']
 
@@ -48,7 +48,7 @@ export default function AttendancePage() {
   const { role } = useAuth()
   const isCaptain = role === 'ROLE_CAPTAIN'
 
-  const { data: allSports = [], isLoading: allSportsLoading } = useSports()
+  const { data: allSports = [], isLoading: allSportsLoading } = useSports(!isCaptain)
   const { data: mySports = [], isLoading: mySportsLoading } = useMySports()
 
   const sports = isCaptain ? mySports : allSports
@@ -62,11 +62,13 @@ export default function AttendancePage() {
     session: null,
   })
 
-  const [sessionForm, setSessionForm] = useState({
-    title: '',
+  const [sessionForm, setSessionForm] = useState<{
+    sessionDate: string
+    slot: 'Morning' | 'Evening'
+    notes: string
+  }>({
     sessionDate: new Date().toISOString().split('T')[0],
-    startTime: '08:00',
-    endTime: '10:00',
+    slot: 'Morning',
     notes: '',
   })
 
@@ -104,11 +106,14 @@ export default function AttendancePage() {
 
   useEffect(() => {
     const map = new Map<number, AttendanceStatus>()
-    // Pre-populate with existing records
+    // Pre-populate with existing records from backend
     for (const rec of attendanceRecords) {
-      map.set(rec.playerId, rec.status)
+      const pId = rec.playerId ?? rec.player?.id
+      if (pId != null) {
+        map.set(Number(pId), rec.status)
+      }
     }
-    // Default any remaining players to PRESENT if not marked yet
+    // Default any remaining unrecorded players to PRESENT
     for (const p of players) {
       if (!map.has(p.id)) {
         map.set(p.id, 'PRESENT')
@@ -144,32 +149,39 @@ export default function AttendancePage() {
 
   const handleCreateSession = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!selectedSportId || !sessionForm.title.trim()) {
-      toast.error('Please enter session title.')
+    if (!selectedSportId) {
+      toast.error('Please select a sport program.')
       return
     }
+    if (!sessionForm.sessionDate) {
+      toast.error('Please select a date.')
+      return
+    }
+
+    const title = `${sessionForm.sessionDate} - ${sessionForm.slot}`
+    const startTime = sessionForm.slot === 'Morning' ? '07:00' : '16:30'
+    const endTime = sessionForm.slot === 'Morning' ? '09:00' : '18:30'
+
     try {
       const created: any = await createSession.mutateAsync({
         sportId: selectedSportId,
         data: {
-          title: sessionForm.title.trim(),
+          title,
           sessionDate: sessionForm.sessionDate,
-          startTime: sessionForm.startTime,
-          endTime: sessionForm.endTime,
-          notes: sessionForm.notes.trim(),
+          startTime,
+          endTime,
+          notes: sessionForm.notes.trim() || undefined,
           status: 'SCHEDULED',
         },
       })
-      toast.success(`Session "${sessionForm.title}" scheduled.`)
+      toast.success(`Session "${title}" scheduled.`)
       setCreateSessionOpen(false)
       if (created?.data?.id || created?.id) {
         setSelectedSessionId(created.data?.id || created.id)
       }
       setSessionForm({
-        title: '',
         sessionDate: new Date().toISOString().split('T')[0],
-        startTime: '08:00',
-        endTime: '10:00',
+        slot: 'Morning',
         notes: '',
       })
     } catch (err: any) {
@@ -433,69 +445,95 @@ export default function AttendancePage() {
             <DialogHeader>
               <DialogTitle className="font-serif flex items-center gap-2">
                 <Calendar className="h-5 w-5 text-accent" />
-                Schedule Training Session for {currentSport?.name}
+                Schedule Session for {currentSport?.name}
               </DialogTitle>
               <DialogDescription>
-                Set up a new training date and time.
+                Pick a date and session slot (Morning or Evening).
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-3.5 my-4">
-              <div className="space-y-1">
-                <Label htmlFor="title" className="text-xs font-sans text-slate-700">Session Title *</Label>
+
+            <div className="space-y-4 my-4">
+              {/* 1. Date */}
+              <div className="space-y-1.5">
+                <Label htmlFor="sessionDate" className="text-xs font-sans font-medium text-slate-700">
+                  Training Date *
+                </Label>
                 <Input
-                  id="title"
-                  placeholder="e.g. Morning Conditioning"
-                  value={sessionForm.title}
-                  onChange={(e) => setSessionForm({ ...sessionForm, title: e.target.value })}
+                  id="sessionDate"
+                  type="date"
+                  value={sessionForm.sessionDate}
+                  onChange={(e) => setSessionForm({ ...sessionForm, sessionDate: e.target.value })}
                   required
+                  className="font-sans"
                 />
               </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div className="space-y-1">
-                  <Label htmlFor="date" className="text-xs font-sans text-slate-700">Date *</Label>
-                  <Input
-                    id="date"
-                    type="date"
-                    value={sessionForm.sessionDate}
-                    onChange={(e) => setSessionForm({ ...sessionForm, sessionDate: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="start" className="text-xs font-sans text-slate-700">Start Time</Label>
-                  <Input
-                    id="start"
-                    type="time"
-                    value={sessionForm.startTime}
-                    onChange={(e) => setSessionForm({ ...sessionForm, startTime: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="end" className="text-xs font-sans text-slate-700">End Time</Label>
-                  <Input
-                    id="end"
-                    type="time"
-                    value={sessionForm.endTime}
-                    onChange={(e) => setSessionForm({ ...sessionForm, endTime: e.target.value })}
-                  />
+
+              {/* 2. Slot Selection (Morning / Evening) */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-sans font-medium text-slate-700">
+                  Session Slot *
+                </Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setSessionForm({ ...sessionForm, slot: 'Morning' })}
+                    className={`flex flex-col items-start p-3 rounded-lg border text-left transition-all ${
+                      sessionForm.slot === 'Morning'
+                        ? 'border-accent bg-accent/5 ring-1 ring-accent'
+                        : 'border-border bg-surface hover:bg-surface/80'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <Sun className={`h-4 w-4 ${sessionForm.slot === 'Morning' ? 'text-amber-500' : 'text-slate-400'}`} />
+                      <span className="font-serif font-medium text-sm text-brand-900">Morning</span>
+                    </div>
+                    <span className="text-xs font-mono text-slate-500">07:00 AM – 09:00 AM</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSessionForm({ ...sessionForm, slot: 'Evening' })}
+                    className={`flex flex-col items-start p-3 rounded-lg border text-left transition-all ${
+                      sessionForm.slot === 'Evening'
+                        ? 'border-accent bg-accent/5 ring-1 ring-accent'
+                        : 'border-border bg-surface hover:bg-surface/80'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <Moon className={`h-4 w-4 ${sessionForm.slot === 'Evening' ? 'text-indigo-500' : 'text-slate-400'}`} />
+                      <span className="font-serif font-medium text-sm text-brand-900">Evening</span>
+                    </div>
+                    <span className="text-xs font-mono text-slate-500">04:30 PM – 06:30 PM</span>
+                  </button>
                 </div>
               </div>
+
+              {/* Preview of auto-generated name */}
+              <div className="p-2.5 rounded bg-surface border border-border flex items-center justify-between text-xs">
+                <span className="text-slate-500 font-sans">Session Name:</span>
+                <span className="font-mono font-semibold text-brand-900">
+                  {sessionForm.sessionDate} - {sessionForm.slot}
+                </span>
+              </div>
+
+              {/* 3. Optional Notes */}
               <div className="space-y-1">
-                <Label htmlFor="notes" className="text-xs font-sans text-slate-700">Session Notes</Label>
+                <Label htmlFor="notes" className="text-xs font-sans text-slate-700">Optional Notes</Label>
                 <Input
                   id="notes"
-                  placeholder="e.g. Bring agility cones and water"
+                  placeholder="e.g. Bring running shoes, practice match"
                   value={sessionForm.notes}
                   onChange={(e) => setSessionForm({ ...sessionForm, notes: e.target.value })}
                 />
               </div>
             </div>
+
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setCreateSessionOpen(false)}>
                 Cancel
               </Button>
               <Button type="submit" className="bg-accent hover:bg-accent-light text-white font-sans text-xs">
-                Create Session
+                Schedule Session
               </Button>
             </DialogFooter>
           </form>

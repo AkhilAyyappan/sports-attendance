@@ -42,7 +42,7 @@ export default function RosterPage() {
   const { role } = useAuth()
   const isCaptain = role === 'ROLE_CAPTAIN'
 
-  const { data: allSports = [], isLoading: allSportsLoading } = useSports()
+  const { data: allSports = [], isLoading: allSportsLoading } = useSports(!isCaptain)
   const { data: mySports = [], isLoading: mySportsLoading } = useMySports()
 
   // If captain, scope strictly to mySports; if admin, allSports

@@ -28,13 +28,15 @@ api.interceptors.request.use((config) => {
   return config
 })
 
-// Response interceptor: handle 401/403 → clear session, redirect to /login
+// Response interceptor: handle 401 → clear session and redirect only if unauthorized
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401 || error.response?.status === 403) {
-      sessionStorage.removeItem('auth')
-      window.location.href = '/login'
+    if (error.response?.status === 401) {
+      if (window.location.pathname !== '/login') {
+        sessionStorage.removeItem('auth')
+        window.location.href = '/login'
+      }
     }
     return Promise.reject(error)
   }

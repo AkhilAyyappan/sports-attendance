@@ -57,6 +57,11 @@ public class TrainingSession extends BaseEntity {
     @Builder.Default
     private List<Attendance> attendances = new ArrayList<>();
 
+    @com.fasterxml.jackson.annotation.JsonProperty("sportId")
+    public Long getSportId() {
+        return sport != null ? sport.getId() : null;
+    }
+
     public enum SessionStatus {
         SCHEDULED, IN_PROGRESS, COMPLETED, CANCELLED
     }

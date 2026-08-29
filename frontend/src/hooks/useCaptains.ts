@@ -2,10 +2,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/api/client'
 import { type Captain } from '@/types'
 
-export function useCaptains() {
+export function useCaptains(enabled: boolean = true) {
   return useQuery({
     queryKey: ['captains'],
     queryFn: () => api.get('/api/users/captains').then((r) => r.data as Captain[]),
+    enabled,
   })
 }
 

@@ -18,9 +18,9 @@ export default function DashboardPage() {
   const { username, role } = useAuth()
   const isCaptain = role === 'ROLE_CAPTAIN'
 
-  const { data: allSports = [], isLoading: allSportsLoading } = useSports()
+  const { data: allSports = [], isLoading: allSportsLoading } = useSports(!isCaptain)
   const { data: mySports = [], isLoading: mySportsLoading } = useMySports()
-  const { data: captains = [], isLoading: captainsLoading } = useCaptains()
+  const { data: captains = [], isLoading: captainsLoading } = useCaptains(!isCaptain)
   const { data: sessions = [], isLoading: sessionsLoading } = useAllSessions()
 
   const sports = isCaptain ? mySports : allSports

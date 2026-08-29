@@ -66,4 +66,9 @@ public class Player extends BaseEntity {
     @OneToMany(mappedBy = "player", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @Builder.Default
     private List<PlayerEvaluation> evaluations = new ArrayList<>();
+
+    @com.fasterxml.jackson.annotation.JsonProperty("sportId")
+    public Long getSportId() {
+        return sport != null ? sport.getId() : null;
+    }
 }

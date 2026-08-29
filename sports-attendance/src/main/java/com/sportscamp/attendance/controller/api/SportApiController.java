@@ -48,8 +48,17 @@ public class SportApiController {
     }
 
     @GetMapping("/{id}")
-    public Sport getById(@PathVariable Long id) {
-        return sportService.findById(id);
+    public ResponseEntity<Sport> getById(@PathVariable Long id, Authentication auth) {
+        Sport sport = sportService.findById(id);
+        if (auth != null && auth.isAuthenticated()) {
+            User user = userService.findByUsername(auth.getName());
+            if (user.getRole() == User.Role.ROLE_CAPTAIN) {
+                if (sport.getCaptain() == null || !sport.getCaptain().getId().equals(user.getId())) {
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+                }
+            }
+        }
+        return ResponseEntity.ok(sport);
     }
 
     @PostMapping
