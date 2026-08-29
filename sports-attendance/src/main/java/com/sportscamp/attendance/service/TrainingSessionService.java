@@ -1,7 +1,6 @@
 package com.sportscamp.attendance.service;
 
-import com.sportscamp.attendance.entity.Camp;
-import com.sportscamp.attendance.entity.Team;
+import com.sportscamp.attendance.entity.Sport;
 import com.sportscamp.attendance.entity.TrainingSession;
 import com.sportscamp.attendance.exception.ResourceNotFoundException;
 import com.sportscamp.attendance.repository.TrainingSessionRepository;
@@ -17,15 +16,14 @@ import java.util.List;
 public class TrainingSessionService {
 
     private final TrainingSessionRepository sessionRepository;
-    private final CampService campService;
-    private final TeamService teamService;
+    private final SportService sportService;
 
-    public List<TrainingSession> findByCamp(Long campId) {
-        return sessionRepository.findByCampIdOrderBySessionDateAsc(campId);
+    public List<TrainingSession> findBySport(Long sportId) {
+        return sessionRepository.findBySportIdOrderBySessionDateAsc(sportId);
     }
 
-    public List<TrainingSession> findForTeam(Long campId, Long teamId) {
-        return sessionRepository.findByCampAndTeamOrCampWide(campId, teamId);
+    public List<TrainingSession> findAll() {
+        return sessionRepository.findAllWithSport();
     }
 
     public TrainingSession findById(Long id) {
@@ -34,19 +32,9 @@ public class TrainingSessionService {
     }
 
     @Transactional
-    public TrainingSession createForCamp(TrainingSession session, Long campId) {
-        Camp camp = campService.findById(campId);
-        session.setCamp(camp);
-        session.setTeam(null);
-        return sessionRepository.save(session);
-    }
-
-    @Transactional
-    public TrainingSession createForTeam(TrainingSession session, Long campId, Long teamId) {
-        Camp camp = campService.findById(campId);
-        Team team = teamService.findById(teamId);
-        session.setCamp(camp);
-        session.setTeam(team);
+    public TrainingSession createForSport(TrainingSession session, Long sportId) {
+        Sport sport = sportService.findById(sportId);
+        session.setSport(sport);
         return sessionRepository.save(session);
     }
 
@@ -67,5 +55,11 @@ public class TrainingSessionService {
         TrainingSession session = findById(id);
         session.setStatus(status);
         sessionRepository.save(session);
+    }
+
+    @Transactional
+    public void delete(Long id) {
+        TrainingSession session = findById(id);
+        sessionRepository.delete(session);
     }
 }

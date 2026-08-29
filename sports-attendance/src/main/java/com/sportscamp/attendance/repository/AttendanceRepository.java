@@ -21,11 +21,11 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
 
     @Query("""
             SELECT a FROM Attendance a
-            WHERE a.player.team.id = :teamId
+            WHERE a.player.sport.id = :sportId
               AND a.session.id = :sessionId
             """)
-    List<Attendance> findByTeamIdAndSessionId(
-            @Param("teamId") Long teamId,
+    List<Attendance> findBySportIdAndSessionId(
+            @Param("sportId") Long sportId,
             @Param("sessionId") Long sessionId);
 
     @Query("""
@@ -39,11 +39,9 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
 
     @Query("""
             SELECT COUNT(a) FROM Attendance a
-            WHERE a.player.team.id = :teamId
-              AND a.session.camp.id = :campId
+            WHERE a.player.sport.id = :sportId
               AND a.status = 'PRESENT'
             """)
-    long countPresentByTeamAndCamp(
-            @Param("teamId") Long teamId,
-            @Param("campId") Long campId);
+    long countPresentBySport(
+            @Param("sportId") Long sportId);
 }

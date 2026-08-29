@@ -1,6 +1,7 @@
 package com.sportscamp.attendance.service;
 
 import com.sportscamp.attendance.entity.Sport;
+import com.sportscamp.attendance.entity.User;
 import com.sportscamp.attendance.exception.DuplicateResourceException;
 import com.sportscamp.attendance.exception.ResourceNotFoundException;
 import com.sportscamp.attendance.repository.SportRepository;
@@ -18,7 +19,7 @@ public class SportService {
     private final SportRepository sportRepository;
 
     public List<Sport> findAll() {
-        return sportRepository.findAll();
+        return sportRepository.findAllWithCaptain();
     }
 
     public List<Sport> findAllActive() {
@@ -26,15 +27,23 @@ public class SportService {
     }
 
     public Sport findById(Long id) {
-        return sportRepository.findById(id)
+        return sportRepository.findByIdWithCaptain(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Sport", id));
+    }
+
+    public List<Sport> findByCaptainId(Long captainId) {
+        return sportRepository.findByCaptainId(captainId);
+    }
+
+    public List<Sport> findByCaptainUsername(String username) {
+        return sportRepository.findByCaptainUsername(username);
     }
 
     @Transactional
     public Sport save(Sport sport) {
-        sportRepository.findByNameIgnoreCase(sport.getName()).ifPresent(s -> {
+        if (sportRepository.existsByNameIgnoreCase(sport.getName())) {
             throw new DuplicateResourceException("Sport already exists: " + sport.getName());
-        });
+        }
         return sportRepository.save(sport);
     }
 
@@ -45,5 +54,18 @@ public class SportService {
         existing.setDescription(updated.getDescription());
         existing.setActive(updated.isActive());
         return sportRepository.save(existing);
+    }
+
+    @Transactional
+    public Sport assignCaptain(Long sportId, User captain) {
+        Sport sport = findById(sportId);
+        sport.setCaptain(captain);
+        return sportRepository.save(sport);
+    }
+
+    @Transactional
+    public void delete(Long id) {
+        Sport sport = findById(id);
+        sportRepository.delete(sport);
     }
 }

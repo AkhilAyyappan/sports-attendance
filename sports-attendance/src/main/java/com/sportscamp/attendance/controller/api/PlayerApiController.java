@@ -17,10 +17,10 @@ public class PlayerApiController {
 
     private final PlayerService playerService;
 
-    /** GET /api/teams/{teamId}/players */
-    @GetMapping("/teams/{teamId}/players")
-    public List<Player> listByTeam(@PathVariable Long teamId) {
-        return playerService.findActiveByTeam(teamId);
+    /** GET /api/sports/{sportId}/players */
+    @GetMapping("/sports/{sportId}/players")
+    public List<Player> listBySport(@PathVariable Long sportId) {
+        return playerService.findAllBySport(sportId);
     }
 
     /** GET /api/players/{id} */
@@ -29,13 +29,13 @@ public class PlayerApiController {
         return playerService.findById(id);
     }
 
-    /** POST /api/teams/{teamId}/players */
-    @PostMapping("/teams/{teamId}/players")
+    /** POST /api/sports/{sportId}/players */
+    @PostMapping("/sports/{sportId}/players")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_CAPTAIN')")
-    public ResponseEntity<Player> addPlayer(@PathVariable Long teamId,
+    public ResponseEntity<Player> addPlayer(@PathVariable Long sportId,
                                             @RequestBody Player player) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(playerService.addPlayer(player, teamId));
+                .body(playerService.addPlayer(player, sportId));
     }
 
     /** PUT /api/players/{id} */
@@ -45,11 +45,11 @@ public class PlayerApiController {
         return playerService.update(id, player);
     }
 
-    /** DELETE /api/players/{id}  — soft deactivate */
+    /** DELETE /api/players/{id} */
     @DeleteMapping("/players/{id}")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_CAPTAIN')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deactivate(@PathVariable Long id) {
-        playerService.deactivate(id);
+    public void deletePlayer(@PathVariable Long id) {
+        playerService.delete(id);
     }
 }

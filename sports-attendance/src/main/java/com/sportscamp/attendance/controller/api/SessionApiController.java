@@ -18,17 +18,16 @@ public class SessionApiController {
 
     private final TrainingSessionService sessionService;
 
-    /** GET /api/camps/{campId}/sessions */
-    @GetMapping("/camps/{campId}/sessions")
-    public List<TrainingSession> listByCamp(@PathVariable Long campId) {
-        return sessionService.findByCamp(campId);
+    /** GET /api/sessions — all sessions across all sports */
+    @GetMapping("/sessions")
+    public List<TrainingSession> listAll() {
+        return sessionService.findAll();
     }
 
-    /** GET /api/camps/{campId}/sessions?teamId=3 — team-specific + camp-wide sessions */
-    @GetMapping(value = "/camps/{campId}/sessions", params = "teamId")
-    public List<TrainingSession> listForTeam(@PathVariable Long campId,
-                                             @RequestParam Long teamId) {
-        return sessionService.findForTeam(campId, teamId);
+    /** GET /api/sports/{sportId}/sessions */
+    @GetMapping("/sports/{sportId}/sessions")
+    public List<TrainingSession> listBySport(@PathVariable Long sportId) {
+        return sessionService.findBySport(sportId);
     }
 
     /** GET /api/sessions/{id} */
@@ -38,26 +37,22 @@ public class SessionApiController {
     }
 
     /**
-     * POST /api/camps/{campId}/sessions
-     * body: { "title":"Morning Run", "sessionDate":"2025-06-05",
-     *         "startTime":"07:00", "endTime":"09:00", "teamId":3 }
-     * Omit teamId to create a camp-wide session.
+     * POST /api/sports/{sportId}/sessions
+     * body: { "title":"Morning Practice", "sessionDate":"2025-06-05",
+     *         "startTime":"07:00", "endTime":"09:00", "notes":"Drills" }
      */
-    @PostMapping("/camps/{campId}/sessions")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
-    public ResponseEntity<TrainingSession> create(@PathVariable Long campId,
+    @PostMapping("/sports/{sportId}/sessions")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_CAPTAIN')")
+    public ResponseEntity<TrainingSession> create(@PathVariable Long sportId,
                                                   @RequestBody Map<String, Object> body) {
         TrainingSession session = buildSession(body);
-        Object teamIdObj = body.get("teamId");
-        TrainingSession saved = teamIdObj != null
-                ? sessionService.createForTeam(session, campId, Long.valueOf(teamIdObj.toString()))
-                : sessionService.createForCamp(session, campId);
+        TrainingSession saved = sessionService.createForSport(session, sportId);
         return ResponseEntity.status(HttpStatus.CREATED).body(saved);
     }
 
     /** PUT /api/sessions/{id} */
     @PutMapping("/sessions/{id}")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_CAPTAIN')")
     public TrainingSession update(@PathVariable Long id,
                                   @RequestBody TrainingSession session) {
         return sessionService.update(id, session);
@@ -65,11 +60,19 @@ public class SessionApiController {
 
     /** PATCH /api/sessions/{id}/status  body: {"status":"COMPLETED"} */
     @PatchMapping("/sessions/{id}/status")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_CAPTAIN')")
     public ResponseEntity<Void> updateStatus(@PathVariable Long id,
                                              @RequestBody Map<String, String> body) {
         sessionService.updateStatus(id, TrainingSession.SessionStatus.valueOf(body.get("status")));
         return ResponseEntity.noContent().build();
+    }
+
+    /** DELETE /api/sessions/{id} */
+    @DeleteMapping("/sessions/{id}")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_CAPTAIN')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteSession(@PathVariable Long id) {
+        sessionService.delete(id);
     }
 
     private TrainingSession buildSession(Map<String, Object> body) {

@@ -1,7 +1,7 @@
 package com.sportscamp.attendance.service;
 
 import com.sportscamp.attendance.entity.Player;
-import com.sportscamp.attendance.entity.Team;
+import com.sportscamp.attendance.entity.Sport;
 import com.sportscamp.attendance.exception.ResourceNotFoundException;
 import com.sportscamp.attendance.repository.PlayerRepository;
 import lombok.RequiredArgsConstructor;
@@ -16,14 +16,14 @@ import java.util.List;
 public class PlayerService {
 
     private final PlayerRepository playerRepository;
-    private final TeamService teamService;
+    private final SportService sportService;
 
-    public List<Player> findActiveByTeam(Long teamId) {
-        return playerRepository.findByTeamIdAndActiveTrue(teamId);
+    public List<Player> findActiveBySport(Long sportId) {
+        return playerRepository.findBySportIdAndActiveTrue(sportId);
     }
 
-    public List<Player> findAllByTeam(Long teamId) {
-        return playerRepository.findByTeamId(teamId);
+    public List<Player> findAllBySport(Long sportId) {
+        return playerRepository.findBySportId(sportId);
     }
 
     public Player findById(Long id) {
@@ -32,9 +32,9 @@ public class PlayerService {
     }
 
     @Transactional
-    public Player addPlayer(Player player, Long teamId) {
-        Team team = teamService.findById(teamId);
-        player.setTeam(team);
+    public Player addPlayer(Player player, Long sportId) {
+        Sport sport = sportService.findById(sportId);
+        player.setSport(sport);
         return playerRepository.save(player);
     }
 
@@ -56,5 +56,11 @@ public class PlayerService {
         Player player = findById(id);
         player.setActive(false);
         playerRepository.save(player);
+    }
+
+    @Transactional
+    public void delete(Long id) {
+        Player player = findById(id);
+        playerRepository.delete(player);
     }
 }

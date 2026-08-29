@@ -33,3 +33,14 @@ export function useToggleCaptain() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['captains'] }),
   })
 }
+
+export function useDeleteCaptain() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => api.delete(`/api/users/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['captains'] })
+      qc.invalidateQueries({ queryKey: ['sports'] })
+    },
+  })
+}

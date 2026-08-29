@@ -1,10 +1,16 @@
 export interface Player {
   id: number
   fullName: string
-  dateOfBirth: string
-  jerseyNumber: string
-  position: string
+  dateOfBirth?: string
+  jerseyNumber?: number | string
+  position?: string
   phone?: string
   email?: string
-  teamId: number
+  notes?: string
+  active?: boolean
+  sportId?: number
+  sport?: {
+    id: number
+    name: string
+  }
 }

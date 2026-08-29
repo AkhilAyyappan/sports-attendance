@@ -24,12 +24,13 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
-    open-in-view: false
+    open-in-view: true
 
   flyway:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: true
+    validate-on-migrate: false
     # prepareThreshold=0 required for Supabase PgBouncer pooler (transaction mode)
     url: ${DB_URL}&prepareThreshold=0
     user: ${DB_USERNAME}

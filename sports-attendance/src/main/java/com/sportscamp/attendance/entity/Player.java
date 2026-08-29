@@ -10,11 +10,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * A player (athlete) registered in a team within a camp.
+ * An athlete registered in a sport program.
  */
 @Entity
 @Table(name = "players",
-       uniqueConstraints = @UniqueConstraint(name = "uk_player_jersey_team", columnNames = {"jersey_number", "team_id"}))
+       uniqueConstraints = @UniqueConstraint(name = "uk_player_jersey_sport", columnNames = {"jersey_number", "sport_id"}))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -53,9 +53,9 @@ public class Player extends BaseEntity {
     private boolean active = true;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "team_id", nullable = false)
-    @JsonIgnoreProperties({"players","captain","hibernateLazyInitializer"})
-    private Team team;
+    @JoinColumn(name = "sport_id", nullable = false)
+    @JsonIgnoreProperties({"players","trainingSessions","captain","hibernateLazyInitializer"})
+    private Sport sport;
 
     @JsonIgnore
     @OneToMany(mappedBy = "player", cascade = CascadeType.ALL, fetch = FetchType.LAZY)

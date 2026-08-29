@@ -1,25 +1,20 @@
 export { useAuth } from './useAuth'
-export { useSports, useActiveSports, useCreateSport, useUpdateSport } from './useSports'
 export {
-  useCamps,
-  useCamp,
-  useCreateCamp,
-  useUpdateCamp,
-  useDeleteCamp,
-} from './useCamps'
+  useSports,
+  useActiveSports,
+  useMySports,
+  useCreateSport,
+  useUpdateSport,
+  useAssignCaptainToSport,
+  useDeleteSport,
+} from './useSports'
 export {
   useCaptains,
   useCreateCaptain,
   useResetPassword,
   useToggleCaptain,
+  useDeleteCaptain,
 } from './useCaptains'
-export {
-  useTeams,
-  useTeam,
-  useCreateTeam,
-  useAssignCaptain,
-  useUpdateTeam,
-} from './useTeams'
 export {
   usePlayers,
   usePlayer,
@@ -29,9 +24,10 @@ export {
 } from './usePlayers'
 export {
   useSessions,
-  useSessionsFiltered,
+  useAllSessions,
   useCreateSession,
   useUpdateSessionStatus,
+  useDeleteSession,
 } from './useSessions'
 export {
   useAttendance,

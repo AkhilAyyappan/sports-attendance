@@ -4,9 +4,10 @@ export interface AttendanceRecord {
   id: number
   sessionId: number
   playerId: number
-  playerFullName: string
+  playerFullName?: string
   status: AttendanceStatus
   remarks?: string
+  markedAt?: string
 }
 
 export interface AttendanceSummary {

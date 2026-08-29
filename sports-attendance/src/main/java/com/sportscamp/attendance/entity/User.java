@@ -1,18 +1,12 @@
 package com.sportscamp.attendance.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
 
-import java.util.HashSet;
-import java.util.Set;
-
 /**
  * System user — either ROLE_ADMIN or ROLE_CAPTAIN.
- *
- * Passwords are always stored BCrypt-hashed. The enabled flag allows
- * soft-disabling a captain without destroying historical data.
+ * Passwords are always stored BCrypt-hashed.
  */
 @Entity
 @Table(name = "users")
@@ -31,6 +25,7 @@ public class User extends BaseEntity {
     @Column(nullable = false, unique = true, length = 100)
     private String username;
 
+    @JsonIgnore
     @Column(nullable = false)
     private String passwordHash;
 
@@ -50,16 +45,6 @@ public class User extends BaseEntity {
     @Column(nullable = false)
     @Builder.Default
     private boolean enabled = true;
-
-    /**
-     * Which team this captain manages. Null for admins.
-     * Relationship deliberately kept nullable/optional so a captain can
-     * exist without a team assignment (e.g., just created by admin).
-     */
-    @JsonIgnore
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "team_id")
-    private Team team;
 
     public enum Role {
         ROLE_ADMIN,
