@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-900: #0F172A;
+  --color-brand-800: #1E293B;
+  --color-brand-700: #334155;
+  --color-accent: #14532D;
+  --color-accent-light: #166534;
+  --color-alert: #881337;
+  --color-alert-light: #9F1239;
+  --color-parchment: #EAB308;
+  --color-surface: #F8F9FA;
+  --color-card: #FFFFFF;
+  --color-border: #DBD6CB;
+  --font-serif: "Lora", Georgia, serif;
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", monospace;
+}
+
+body {
+  font-family: var(--font-sans);
+  margin: 0;
+  background: var(--color-surface);
+  color: #1E293B;
+}
+
+/* Academic ledger table styling */
+.ledger-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.ledger-table th,
+.ledger-table td {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.ledger-table th {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* Global focus styles for keyboard navigation */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Scrollbar refinement for sheets */
+.sheet-content::-webkit-scrollbar {
+  width: 6px;
+}
+.sheet-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sheet-content::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
