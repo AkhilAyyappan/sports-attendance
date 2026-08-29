@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 import {
   Table,
@@ -72,27 +72,38 @@ export default function AttendancePage() {
     notes: '',
   })
 
-  // Auto select sport
+  // Auto select sport — only on sports list change, not on selectedSportId change
+  const lastAutoSportIdRef = useRef<number | null>(null)
   useEffect(() => {
     if (sports.length > 0) {
       if (selectedSportId === null || !sports.some((s) => s.id === selectedSportId)) {
-        setSelectedSportId(sports[0].id)
+        const newId = sports[0].id
+        if (newId !== lastAutoSportIdRef.current) {
+          lastAutoSportIdRef.current = newId
+          setSelectedSportId(newId)
+        }
       }
     }
-  }, [sports, selectedSportId])
+  }, [sports]) // removed selectedSportId from deps to prevent loop
 
   const { data: sessions = [] } = useSessions(selectedSportId ?? 0)
 
-  // Auto select first session
+  // Auto select first session — only on sessions list change
+  const lastAutoSessionIdRef = useRef<number | null>(null)
   useEffect(() => {
     if (sessions.length > 0) {
       if (selectedSessionId === null || !sessions.some((s) => s.id === selectedSessionId)) {
-        setSelectedSessionId(sessions[0].id)
+        const newId = sessions[0].id
+        if (newId !== lastAutoSessionIdRef.current) {
+          lastAutoSessionIdRef.current = newId
+          setSelectedSessionId(newId)
+        }
       }
-    } else {
+    } else if (selectedSessionId !== null) {
+      lastAutoSessionIdRef.current = null
       setSelectedSessionId(null)
     }
-  }, [sessions, selectedSessionId])
+  }, [sessions]) // removed selectedSessionId from deps to prevent loop
 
   const { data: players = [], isLoading: playersLoading } = usePlayers(selectedSportId ?? 0)
   const { data: attendanceRecords = [], isLoading: attendanceLoading } = useAttendance(selectedSessionId ?? 0)
@@ -119,7 +130,13 @@ export default function AttendancePage() {
         map.set(p.id, 'PRESENT')
       }
     }
-    setPlayerStatuses(map)
+    // Only update if content actually changed — prevents infinite loop from new Map reference
+    setPlayerStatuses((prev) => {
+      if (prev.size === map.size && Array.from(map.entries()).every(([k, v]) => prev.get(k) === v)) {
+        return prev
+      }
+      return map
+    })
   }, [attendanceRecords, players, selectedSessionId])
 
   const setStatus = (playerId: number, status: AttendanceStatus) => {
