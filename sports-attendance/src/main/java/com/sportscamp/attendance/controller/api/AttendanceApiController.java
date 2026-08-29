@@ -2,11 +2,17 @@ package com.sportscamp.attendance.controller.api;
 
 import com.sportscamp.attendance.entity.Attendance;
 import com.sportscamp.attendance.entity.Attendance.AttendanceStatus;
+import com.sportscamp.attendance.entity.Player;
+import com.sportscamp.attendance.entity.TrainingSession;
 import com.sportscamp.attendance.entity.User;
 import com.sportscamp.attendance.service.AttendanceService;
+import com.sportscamp.attendance.service.PlayerService;
+import com.sportscamp.attendance.service.TrainingSessionService;
 import com.sportscamp.attendance.service.UserService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -22,17 +28,45 @@ public class AttendanceApiController {
 
     private final AttendanceService attendanceService;
     private final UserService userService;
+    private final TrainingSessionService sessionService;
+    private final PlayerService playerService;
+
+    private boolean isCaptainOfSession(User user, TrainingSession session) {
+        if (user.getRole() == User.Role.ROLE_ADMIN) return true;
+        if (session.getSport() == null || session.getSport().getCaptain() == null) return false;
+        return session.getSport().getCaptain().getId().equals(user.getId());
+    }
+
+    private boolean isCaptainOfPlayer(User user, Player player) {
+        if (user.getRole() == User.Role.ROLE_ADMIN) return true;
+        if (player.getSport() == null || player.getSport().getCaptain() == null) return false;
+        return player.getSport().getCaptain().getId().equals(user.getId());
+    }
 
     /** GET /api/sessions/{sessionId}/attendance */
     @GetMapping("/sessions/{sessionId}/attendance")
-    public List<Attendance> getBySession(@PathVariable Long sessionId) {
-        return attendanceService.findBySession(sessionId);
+    public ResponseEntity<List<Attendance>> getBySession(@PathVariable Long sessionId, Authentication auth) {
+        if (auth != null && auth.isAuthenticated()) {
+            User me = userService.findByUsername(auth.getName());
+            TrainingSession session = sessionService.findById(sessionId);
+            if (!isCaptainOfSession(me, session)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
+        }
+        return ResponseEntity.ok(attendanceService.findBySession(sessionId));
     }
 
     /** GET /api/players/{playerId}/attendance */
     @GetMapping("/players/{playerId}/attendance")
-    public List<Attendance> getByPlayer(@PathVariable Long playerId) {
-        return attendanceService.findByPlayer(playerId);
+    public ResponseEntity<List<Attendance>> getByPlayer(@PathVariable Long playerId, Authentication auth) {
+        if (auth != null && auth.isAuthenticated()) {
+            User me = userService.findByUsername(auth.getName());
+            Player player = playerService.findById(playerId);
+            if (!isCaptainOfPlayer(me, player)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
+        }
+        return ResponseEntity.ok(attendanceService.findByPlayer(playerId));
     }
 
     /**
@@ -48,13 +82,18 @@ public class AttendanceApiController {
             Authentication auth) {
 
         User me = userService.findByUsername(auth.getName());
+        TrainingSession session = sessionService.findById(sessionId);
+        if (!isCaptainOfSession(me, session)) {
+            throw new AccessDeniedException("You are not authorized to record attendance for this sport.");
+        }
+
         Map<Long, AttendanceStatus> statusMap = new HashMap<>();
 
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> records = (List<Map<String, Object>>) body.get("records");
         if (records != null) {
             records.forEach(r -> {
-                Long   playerId = Long.valueOf(r.get("playerId").toString());
+                Long playerId = Long.valueOf(r.get("playerId").toString());
                 AttendanceStatus status = AttendanceStatus.valueOf(r.get("status").toString());
                 statusMap.put(playerId, status);
             });
@@ -86,3 +125,4 @@ public class AttendanceApiController {
         return Map.of("presentCount", attendanceService.countPresent(playerId));
     }
 }
+

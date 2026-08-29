@@ -56,6 +56,21 @@ public class Attendance extends BaseEntity {
     @Column(length = 500)
     private String remarks;
 
+    @com.fasterxml.jackson.annotation.JsonProperty("playerId")
+    public Long getPlayerId() {
+        return player != null ? player.getId() : null;
+    }
+
+    @com.fasterxml.jackson.annotation.JsonProperty("sessionId")
+    public Long getSessionId() {
+        return session != null ? session.getId() : null;
+    }
+
+    @com.fasterxml.jackson.annotation.JsonProperty("playerFullName")
+    public String getPlayerFullName() {
+        return player != null ? player.getFullName() : null;
+    }
+
     public enum AttendanceStatus {
         PRESENT,
         ABSENT,

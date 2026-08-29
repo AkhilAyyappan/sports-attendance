@@ -5,7 +5,7 @@
 INSERT INTO users (username, password_hash, full_name, email, role, enabled)
 VALUES (
     'admin',
-    '$2a$12$n7vf.9iuVENVuX7I5p6nVOI/Xii3VEWNRZfJ0LMoVFy7p0fE0yk7S',
+    '$2a$10$KtMPNPrOj0NQZTgh3xUbDevqmUjk/H68M1n7RSxhy.CirOMzy.vtW',
     'System Administrator',
     'admin@sportscamp.com',
     'ROLE_ADMIN',

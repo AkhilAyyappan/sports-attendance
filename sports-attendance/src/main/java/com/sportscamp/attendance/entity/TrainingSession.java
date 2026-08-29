@@ -11,9 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * A single training session within a camp.
- * Sessions belong to a camp and (optionally) a specific team.
- * A null team means the session is for all teams in the camp.
+ * A training session for a specific sport program.
  */
 @Entity
 @Table(name = "training_sessions")
@@ -50,22 +48,19 @@ public class TrainingSession extends BaseEntity {
     private SessionStatus status = SessionStatus.SCHEDULED;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "camp_id", nullable = false)
-    @JsonIgnoreProperties({"teams","trainingSessions","hibernateLazyInitializer"})
-    private Camp camp;
-
-    /**
-     * Optional — if null the session is camp-wide; if set it belongs to one team.
-     */
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "team_id")
-    @JsonIgnoreProperties({"players","captain","camp","sport","hibernateLazyInitializer"})
-    private Team team;
+    @JoinColumn(name = "sport_id", nullable = false)
+    @JsonIgnoreProperties({"players","trainingSessions","captain","hibernateLazyInitializer"})
+    private Sport sport;
 
     @JsonIgnore
     @OneToMany(mappedBy = "session", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @Builder.Default
     private List<Attendance> attendances = new ArrayList<>();
+
+    @com.fasterxml.jackson.annotation.JsonProperty("sportId")
+    public Long getSportId() {
+        return sport != null ? sport.getId() : null;
+    }
 
     public enum SessionStatus {
         SCHEDULED, IN_PROGRESS, COMPLETED, CANCELLED

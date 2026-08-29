@@ -1,13 +1,20 @@
 package com.sportscamp.attendance.controller.api;
 
+import com.sportscamp.attendance.entity.Sport;
 import com.sportscamp.attendance.entity.TrainingSession;
+import com.sportscamp.attendance.entity.User;
+import com.sportscamp.attendance.service.SportService;
 import com.sportscamp.attendance.service.TrainingSessionService;
+import com.sportscamp.attendance.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -17,59 +24,122 @@ import java.util.Map;
 public class SessionApiController {
 
     private final TrainingSessionService sessionService;
+    private final UserService userService;
+    private final SportService sportService;
 
-    /** GET /api/camps/{campId}/sessions */
-    @GetMapping("/camps/{campId}/sessions")
-    public List<TrainingSession> listByCamp(@PathVariable Long campId) {
-        return sessionService.findByCamp(campId);
+    private boolean isCaptainOfSport(User user, Long sportId) {
+        if (user.getRole() == User.Role.ROLE_ADMIN) return true;
+        Sport sport = sportService.findById(sportId);
+        return sport.getCaptain() != null && sport.getCaptain().getId().equals(user.getId());
     }
 
-    /** GET /api/camps/{campId}/sessions?teamId=3 — team-specific + camp-wide sessions */
-    @GetMapping(value = "/camps/{campId}/sessions", params = "teamId")
-    public List<TrainingSession> listForTeam(@PathVariable Long campId,
-                                             @RequestParam Long teamId) {
-        return sessionService.findForTeam(campId, teamId);
+    private boolean isCaptainOfSession(User user, TrainingSession session) {
+        if (user.getRole() == User.Role.ROLE_ADMIN) return true;
+        if (session.getSport() == null || session.getSport().getCaptain() == null) return false;
+        return session.getSport().getCaptain().getId().equals(user.getId());
+    }
+
+    /** GET /api/sessions — all sessions (scoped to captain's assigned sports if captain) */
+    @GetMapping("/sessions")
+    public List<TrainingSession> listAll(Authentication auth) {
+        if (auth != null && auth.isAuthenticated()) {
+            User me = userService.findByUsername(auth.getName());
+            if (me.getRole() == User.Role.ROLE_CAPTAIN) {
+                List<Sport> mySports = sportService.findByCaptainId(me.getId());
+                List<TrainingSession> result = new ArrayList<>();
+                for (Sport sport : mySports) {
+                    result.addAll(sessionService.findBySport(sport.getId()));
+                }
+                return result;
+            }
+        }
+        return sessionService.findAll();
+    }
+
+    /** GET /api/sports/{sportId}/sessions */
+    @GetMapping("/sports/{sportId}/sessions")
+    public ResponseEntity<List<TrainingSession>> listBySport(@PathVariable Long sportId, Authentication auth) {
+        if (auth != null && auth.isAuthenticated()) {
+            User me = userService.findByUsername(auth.getName());
+            if (!isCaptainOfSport(me, sportId)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
+        }
+        return ResponseEntity.ok(sessionService.findBySport(sportId));
     }
 
     /** GET /api/sessions/{id} */
     @GetMapping("/sessions/{id}")
-    public TrainingSession getById(@PathVariable Long id) {
-        return sessionService.findById(id);
+    public ResponseEntity<TrainingSession> getById(@PathVariable Long id, Authentication auth) {
+        TrainingSession session = sessionService.findById(id);
+        if (auth != null && auth.isAuthenticated()) {
+            User me = userService.findByUsername(auth.getName());
+            if (!isCaptainOfSession(me, session)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
+        }
+        return ResponseEntity.ok(session);
     }
 
     /**
-     * POST /api/camps/{campId}/sessions
-     * body: { "title":"Morning Run", "sessionDate":"2025-06-05",
-     *         "startTime":"07:00", "endTime":"09:00", "teamId":3 }
-     * Omit teamId to create a camp-wide session.
+     * POST /api/sports/{sportId}/sessions
+     * body: { "title":"Morning Practice", "sessionDate":"2025-06-05",
+     *         "startTime":"07:00", "endTime":"09:00", "notes":"Drills" }
      */
-    @PostMapping("/camps/{campId}/sessions")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
-    public ResponseEntity<TrainingSession> create(@PathVariable Long campId,
-                                                  @RequestBody Map<String, Object> body) {
+    @PostMapping("/sports/{sportId}/sessions")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_CAPTAIN')")
+    public ResponseEntity<TrainingSession> create(@PathVariable Long sportId,
+                                                  @RequestBody Map<String, Object> body,
+                                                  Authentication auth) {
+        User me = userService.findByUsername(auth.getName());
+        if (!isCaptainOfSport(me, sportId)) {
+            throw new AccessDeniedException("You are not authorized to create sessions for this sport.");
+        }
         TrainingSession session = buildSession(body);
-        Object teamIdObj = body.get("teamId");
-        TrainingSession saved = teamIdObj != null
-                ? sessionService.createForTeam(session, campId, Long.valueOf(teamIdObj.toString()))
-                : sessionService.createForCamp(session, campId);
+        TrainingSession saved = sessionService.createForSport(session, sportId);
         return ResponseEntity.status(HttpStatus.CREATED).body(saved);
     }
 
     /** PUT /api/sessions/{id} */
     @PutMapping("/sessions/{id}")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_CAPTAIN')")
     public TrainingSession update(@PathVariable Long id,
-                                  @RequestBody TrainingSession session) {
+                                  @RequestBody TrainingSession session,
+                                  Authentication auth) {
+        User me = userService.findByUsername(auth.getName());
+        TrainingSession existing = sessionService.findById(id);
+        if (!isCaptainOfSession(me, existing)) {
+            throw new AccessDeniedException("You are not authorized to modify this session.");
+        }
         return sessionService.update(id, session);
     }
 
     /** PATCH /api/sessions/{id}/status  body: {"status":"COMPLETED"} */
     @PatchMapping("/sessions/{id}/status")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_CAPTAIN')")
     public ResponseEntity<Void> updateStatus(@PathVariable Long id,
-                                             @RequestBody Map<String, String> body) {
+                                             @RequestBody Map<String, String> body,
+                                             Authentication auth) {
+        User me = userService.findByUsername(auth.getName());
+        TrainingSession existing = sessionService.findById(id);
+        if (!isCaptainOfSession(me, existing)) {
+            throw new AccessDeniedException("You are not authorized to modify this session status.");
+        }
         sessionService.updateStatus(id, TrainingSession.SessionStatus.valueOf(body.get("status")));
         return ResponseEntity.noContent().build();
+    }
+
+    /** DELETE /api/sessions/{id} */
+    @DeleteMapping("/sessions/{id}")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_CAPTAIN')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteSession(@PathVariable Long id, Authentication auth) {
+        User me = userService.findByUsername(auth.getName());
+        TrainingSession existing = sessionService.findById(id);
+        if (!isCaptainOfSession(me, existing)) {
+            throw new AccessDeniedException("You are not authorized to delete this session.");
+        }
+        sessionService.delete(id);
     }
 
     private TrainingSession buildSession(Map<String, Object> body) {
@@ -86,3 +156,4 @@ public class SessionApiController {
         return s;
     }
 }
+

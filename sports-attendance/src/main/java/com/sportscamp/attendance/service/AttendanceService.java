@@ -5,6 +5,7 @@ import com.sportscamp.attendance.entity.Attendance.AttendanceStatus;
 import com.sportscamp.attendance.entity.Player;
 import com.sportscamp.attendance.entity.TrainingSession;
 import com.sportscamp.attendance.entity.User;
+import com.sportscamp.attendance.exception.ResourceNotFoundException;
 import com.sportscamp.attendance.repository.AttendanceRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -31,15 +32,10 @@ public class AttendanceService {
         return attendanceRepository.findByPlayerId(playerId);
     }
 
-    public List<Attendance> findByTeamAndSession(Long teamId, Long sessionId) {
-        return attendanceRepository.findByTeamIdAndSessionId(teamId, sessionId);
+    public List<Attendance> findBySportAndSession(Long sportId, Long sessionId) {
+        return attendanceRepository.findBySportIdAndSessionId(sportId, sessionId);
     }
 
-    /**
-     * Bulk-save attendance for an entire session.
-     * playerStatusMap: playerId → AttendanceStatus
-     * Creates new records or updates existing ones (upsert behaviour).
-     */
     @Transactional
     public void saveAttendance(Long sessionId, Map<Long, AttendanceStatus> playerStatusMap, User markedBy) {
         TrainingSession session = sessionService.findById(sessionId);
@@ -62,8 +58,7 @@ public class AttendanceService {
     @Transactional
     public Attendance updateOne(Long attendanceId, AttendanceStatus status, String remarks, User markedBy) {
         Attendance attendance = attendanceRepository.findById(attendanceId)
-                .orElseThrow(() -> new com.sportscamp.attendance.exception.ResourceNotFoundException(
-                        "Attendance", attendanceId));
+                .orElseThrow(() -> new ResourceNotFoundException("Attendance", attendanceId));
         attendance.setStatus(status);
         attendance.setRemarks(remarks);
         attendance.setMarkedBy(markedBy);
