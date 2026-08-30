@@ -490,8 +490,8 @@ export default function AdminPage() {
                 <p className="text-slate-400 font-sans text-sm">No captains found.</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <Table className="ledger-table w-max">
+              <div className="sm:overflow-x-auto">
+                <Table className="ledger-table w-full card-table">
                   <TableHeader>
                     <TableRow className="bg-surface hover:bg-surface border-b border-border">
                       <TableHead className="font-serif text-brand-800 min-w-[140px]">Captain / Coach</TableHead>
@@ -506,11 +506,11 @@ export default function AdminPage() {
                       const isAssigned = !!captain.sportName
                       return (
                         <TableRow key={captain.id} className="hover:bg-surface/50">
-                          <TableCell>
+                          <TableCell data-label="Captain / Coach">
                             <div className="font-serif font-medium text-brand-900">{captain.fullName}</div>
                             <div className="text-xs font-mono text-slate-400">@{captain.username}</div>
                           </TableCell>
-                          <TableCell>
+                          <TableCell data-label="Assigned Sport(s)">
                             {isAssigned ? (
                               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200">
                                 <Trophy className="h-3 w-3 text-emerald-600" />
@@ -522,14 +522,14 @@ export default function AdminPage() {
                               </span>
                             )}
                           </TableCell>
-                          <TableCell className="font-sans text-xs text-slate-600">
+                          <TableCell data-label="Contact" className="font-sans text-xs text-slate-600">
                             <div>{captain.email || '—'}</div>
                             <div className="font-mono text-slate-400">{captain.phone || '—'}</div>
                           </TableCell>
-                          <TableCell>
+                          <TableCell data-label="Status">
                             <StatusBadge status={captain.enabled !== false ? 'ACTIVE' : 'INACTIVE'} />
                           </TableCell>
-                          <TableCell>
+                          <TableCell data-label="Actions">
                             <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-1.5">
                               <Button
                                 size="sm"
@@ -613,8 +613,8 @@ export default function AdminPage() {
                 <p className="text-slate-400 font-sans text-sm">No sports created yet.</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <Table className="ledger-table w-max">
+              <div className="sm:overflow-x-auto">
+                <Table className="ledger-table w-full card-table">
                   <TableHeader>
                     <TableRow className="bg-surface hover:bg-surface border-b border-border">
                       <TableHead className="font-serif text-brand-800 min-w-[140px]">Sport Discipline</TableHead>
@@ -632,17 +632,17 @@ export default function AdminPage() {
                       return (
                         <>
                           <TableRow key={sport.id} className="hover:bg-surface/50">
-                            <TableCell>
+                            <TableCell data-label="Sport Discipline">
                               <div className="font-serif font-medium text-brand-900 flex items-center gap-2">
                                 <Activity className="h-4 w-4 text-accent" />
                                 {sport.name}
                               </div>
                               <div className="text-xs font-mono text-slate-400">ID: {sport.id}</div>
                             </TableCell>
-                            <TableCell className="font-sans text-xs text-slate-600 max-w-xs truncate">
+                            <TableCell data-label="Description" className="font-sans text-xs text-slate-600 max-w-xs truncate">
                               {sport.description || '—'}
                             </TableCell>
-                            <TableCell>
+                            <TableCell data-label="Captains / Admins">
                               <div className="flex flex-col gap-1.5">
                                 {sportCaptains.length > 0 ? (
                                   sportCaptains.map((cap) => (
@@ -688,10 +688,10 @@ export default function AdminPage() {
                                 </Button>
                               </div>
                             </TableCell>
-                            <TableCell>
+                            <TableCell data-label="Status">
                               <StatusBadge status={sport.active ? 'ACTIVE' : 'INACTIVE'} />
                             </TableCell>
-                            <TableCell>
+                            <TableCell data-label="Actions">
                               <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-1.5">
                                 <Button
                                   size="sm"
@@ -747,7 +747,7 @@ export default function AdminPage() {
                           </TableRow>
                           {isExpanded && (
                             <TableRow className="bg-surface/30">
-                              <TableCell colSpan={5} className="p-0">
+                              <TableCell colSpan={5} className="p-0" data-full>
                                 <SportPlayersSection
                                   sportId={sport.id}
                                   sportName={sport.name}

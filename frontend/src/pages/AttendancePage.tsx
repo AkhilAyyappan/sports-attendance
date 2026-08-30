@@ -391,8 +391,8 @@ export default function AttendancePage() {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <Table className="ledger-table w-max">
+          <div className="sm:overflow-x-auto">
+            <Table className="ledger-table w-full card-table">
               <TableHeader>
                 <TableRow className="bg-surface hover:bg-surface border-b border-border">
                   <TableHead className="w-16 font-serif text-brand-800 min-w-[40px]">#</TableHead>
@@ -406,16 +406,16 @@ export default function AttendancePage() {
                   const currentSt = playerStatuses.get(player.id) ?? 'PRESENT'
                   return (
                     <TableRow key={player.id} className="hover:bg-surface/50">
-                      <TableCell className="font-mono text-sm font-semibold text-brand-800">
+                      <TableCell data-label="#" className="font-mono text-sm font-semibold text-brand-800">
                         {player.jerseyNumber ?? '—'}
                       </TableCell>
-                      <TableCell>
+                      <TableCell data-label="Athlete">
                         <div className="font-serif font-medium text-brand-900">{player.fullName}</div>
                       </TableCell>
-                      <TableCell className="font-sans text-sm text-slate-600">
+                      <TableCell data-label="Position" className="font-sans text-sm text-slate-600">
                         {player.position || 'Athlete'}
                       </TableCell>
-                      <TableCell>
+                      <TableCell data-label="Attendance Status">
                         {/* Desktop: horizontal row. Mobile: vertical stack of full-width buttons. */}
                         <div className="hidden sm:flex items-center justify-end gap-1.5">
                           {STATUS_OPTIONS.map((st) => {

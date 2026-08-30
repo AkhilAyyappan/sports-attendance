@@ -99,6 +99,14 @@ body {
   .card-table td[data-label="Actions"]:before {
     display: none;
   }
+  /* Full-width cells (expanded sections) — no label padding */
+  .card-table td[data-full] {
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .card-table td[data-full]:before {
+    display: none;
+  }
 }
 
 /* Scrollbar refinement for sheets */

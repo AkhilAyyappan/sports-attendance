@@ -104,13 +104,13 @@ export default function DashboardPage() {
             {isCaptain ? 'Your Scheduled Training Sessions' : 'Upcoming Training Sessions'}
           </h2>
         </div>
-        <div className="p-0 overflow-x-auto">
+        <div className="p-0 sm:overflow-x-auto">
           {upcomingSessions.length === 0 ? (
             <div className="px-6 py-12 text-center">
               <p className="text-slate-400 font-sans text-sm">No upcoming training sessions scheduled.</p>
             </div>
           ) : (
-            <Table className="ledger-table w-max">
+            <Table className="ledger-table w-full card-table">
               <TableHeader>
                 <TableRow className="bg-surface hover:bg-surface border-b border-border">
                   <TableHead className="font-serif text-brand-800 min-w-[180px]">Session Title</TableHead>
@@ -123,19 +123,19 @@ export default function DashboardPage() {
               <TableBody>
                 {upcomingSessions.map((session) => (
                   <TableRow key={session.id} className="hover:bg-surface/50">
-                    <TableCell className="font-serif font-medium text-brand-900">
+                    <TableCell data-label="Session" className="font-serif font-medium text-brand-900">
                       {session.title}
                     </TableCell>
-                    <TableCell className="font-sans text-sm">
-                      {session.sport?.name || 'General Sport'}
+                    <TableCell data-label="Sport">
+                      <span className="font-sans text-sm">{session.sport?.name || 'General Sport'}</span>
                     </TableCell>
-                    <TableCell className="font-mono text-sm">
-                      {session.sessionDate}
+                    <TableCell data-label="Date">
+                      <span className="font-mono text-sm">{session.sessionDate}</span>
                     </TableCell>
-                    <TableCell className="font-mono text-sm">
-                      {session.startTime || '—'} {session.endTime ? `– ${session.endTime}` : ''}
+                    <TableCell data-label="Time">
+                      <span className="font-mono text-sm">{session.startTime || '—'} {session.endTime ? `– ${session.endTime}` : ''}</span>
                     </TableCell>
-                    <TableCell>
+                    <TableCell data-label="Status">
                       <StatusBadge status={session.status} />
                     </TableCell>
                   </TableRow>

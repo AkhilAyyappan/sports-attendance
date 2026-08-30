@@ -282,8 +282,8 @@ export default function RosterPage() {
             </Button>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <Table className="ledger-table w-max">
+          <div className="sm:overflow-x-auto">
+            <Table className="ledger-table w-full card-table">
               <TableHeader>
                 <TableRow className="bg-surface hover:bg-surface border-b border-border">
                   <TableHead className="w-16 font-serif text-brand-800 min-w-[40px]">#</TableHead>
@@ -301,24 +301,24 @@ export default function RosterPage() {
                     className="hover:bg-surface/50 cursor-pointer"
                     onClick={() => setSelectedPlayer(player)}
                   >
-                    <TableCell className="font-mono text-sm font-semibold text-brand-800">
+                    <TableCell data-label="#" className="font-mono text-sm font-semibold text-brand-800">
                       {player.jerseyNumber ?? '—'}
                     </TableCell>
-                    <TableCell>
+                    <TableCell data-label="Athlete Name">
                       <div className="font-serif font-medium text-brand-900">{player.fullName}</div>
                       {player.notes && <div className="text-xs text-slate-400 truncate max-w-xs">{player.notes}</div>}
                     </TableCell>
-                    <TableCell className="font-sans text-sm text-slate-600">
+                    <TableCell data-label="Position / Role" className="font-sans text-sm text-slate-600">
                       {player.position || '—'}
                     </TableCell>
-                    <TableCell className="font-sans text-xs text-slate-600">
+                    <TableCell data-label="Contact" className="font-sans text-xs text-slate-600">
                       <div>{player.email || '—'}</div>
                       <div className="font-mono text-slate-400">{player.phone || '—'}</div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell data-label="Status">
                       <StatusBadge status={player.active !== false ? 'ACTIVE' : 'INACTIVE'} />
                     </TableCell>
-                    <TableCell>
+                    <TableCell data-label="Actions">
                       <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-1.5">
                         <Button
                           size="sm"
@@ -662,8 +662,8 @@ function PlayerAttendanceHistory({ playerId }: { playerId: number }) {
       {attendances.length === 0 ? (
         <p className="text-xs text-slate-400">No session attendance recorded yet.</p>
       ) : (
-        <div className="border border-border rounded overflow-hidden max-h-60 overflow-y-auto">
-          <Table className="ledger-table text-xs">
+        <div className="border border-border rounded overflow-hidden max-h-60 overflow-y-auto sm:overflow-x-auto">
+          <Table className="ledger-table text-xs card-table">
             <TableHeader>
               <TableRow className="bg-surface">
                 <TableHead>Session</TableHead>
@@ -674,9 +674,9 @@ function PlayerAttendanceHistory({ playerId }: { playerId: number }) {
             <TableBody>
               {attendances.map((a) => (
                 <TableRow key={a.id}>
-                  <TableCell className="font-medium text-brand-900">{`Session #${a.sessionId}`}</TableCell>
-                  <TableCell><StatusBadge status={a.status} /></TableCell>
-                  <TableCell className="font-mono text-slate-400">{a.markedAt ? new Date(a.markedAt).toLocaleDateString() : '—'}</TableCell>
+                  <TableCell data-label="Session" className="font-medium text-brand-900">{`Session #${a.sessionId}`}</TableCell>
+                  <TableCell data-label="Status"><StatusBadge status={a.status} /></TableCell>
+                  <TableCell data-label="Date" className="font-mono text-slate-400">{a.markedAt ? new Date(a.markedAt).toLocaleDateString() : '—'}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
