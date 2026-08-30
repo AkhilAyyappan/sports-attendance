@@ -12,20 +12,20 @@ import java.util.Optional;
 @Repository
 public interface SportRepository extends JpaRepository<Sport, Long> {
 
-    @Query("SELECT s FROM Sport s LEFT JOIN FETCH s.captain ORDER BY s.name ASC")
-    List<Sport> findAllWithCaptain();
+    @Query("SELECT DISTINCT s FROM Sport s LEFT JOIN FETCH s.captains ORDER BY s.name ASC")
+    List<Sport> findAllWithCaptains();
 
-    @Query("SELECT s FROM Sport s LEFT JOIN FETCH s.captain WHERE s.active = true ORDER BY s.name ASC")
+    @Query("SELECT DISTINCT s FROM Sport s LEFT JOIN FETCH s.captains WHERE s.active = true ORDER BY s.name ASC")
     List<Sport> findByActiveTrue();
 
-    @Query("SELECT s FROM Sport s LEFT JOIN FETCH s.captain WHERE s.captain.id = :captainId ORDER BY s.name ASC")
+    @Query("SELECT DISTINCT s FROM Sport s JOIN FETCH s.captains c WHERE c.id = :captainId ORDER BY s.name ASC")
     List<Sport> findByCaptainId(@Param("captainId") Long captainId);
 
-    @Query("SELECT s FROM Sport s LEFT JOIN FETCH s.captain WHERE s.captain.username = :username ORDER BY s.name ASC")
+    @Query("SELECT DISTINCT s FROM Sport s JOIN FETCH s.captains c WHERE c.username = :username ORDER BY s.name ASC")
     List<Sport> findByCaptainUsername(@Param("username") String username);
 
-    @Query("SELECT s FROM Sport s LEFT JOIN FETCH s.captain WHERE s.id = :id")
-    Optional<Sport> findByIdWithCaptain(@Param("id") Long id);
+    @Query("SELECT DISTINCT s FROM Sport s LEFT JOIN FETCH s.captains WHERE s.id = :id")
+    Optional<Sport> findByIdWithCaptains(@Param("id") Long id);
 
     Optional<Sport> findByNameIgnoreCase(String name);
 

@@ -277,24 +277,30 @@ export default function AttendancePage() {
             <Trophy className="h-3.5 w-3.5 text-accent" />
             {isCaptain ? 'Your Assigned Sport' : '1. Select Sport Program'}
           </Label>
-          <Select
-            value={selectedSportId?.toString() ?? ''}
-            onValueChange={(v) => {
-              setSelectedSportId(Number(v))
-              setSelectedSessionId(null)
-            }}
-          >
-            <SelectTrigger className="font-sans bg-surface">
-              <SelectValue placeholder={sports.length === 0 ? 'No sports assigned' : 'Choose a sport…'} />
-            </SelectTrigger>
-            <SelectContent>
-              {sports.map((sport) => (
-                <SelectItem key={sport.id} value={sport.id.toString()}>
-                  {sport.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {isCaptain ? (
+            <div className="font-sans text-sm font-semibold text-accent bg-accent/10 px-3 py-2 rounded-md border border-accent/20">
+              {currentSport?.name || 'Loading…'}
+            </div>
+          ) : (
+            <Select
+              value={selectedSportId?.toString() ?? ''}
+              onValueChange={(v) => {
+                setSelectedSportId(Number(v))
+                setSelectedSessionId(null)
+              }}
+            >
+              <SelectTrigger className="font-sans bg-surface">
+                <SelectValue placeholder={sports.length === 0 ? 'No sports assigned' : 'Choose a sport…'} />
+              </SelectTrigger>
+              <SelectContent>
+                {sports.map((sport) => (
+                  <SelectItem key={sport.id} value={sport.id.toString()}>
+                    {sport.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
 
         {/* 2. Session Selector */}
@@ -385,14 +391,14 @@ export default function AttendancePage() {
             </p>
           </div>
         ) : (
-          <div>
-            <Table className="ledger-table">
+          <div className="overflow-x-auto">
+            <Table className="ledger-table w-max">
               <TableHeader>
                 <TableRow className="bg-surface hover:bg-surface border-b border-border">
-                  <TableHead className="w-16 font-serif text-brand-800">#</TableHead>
-                  <TableHead className="font-serif text-brand-800">Athlete</TableHead>
-                  <TableHead className="font-serif text-brand-800">Position</TableHead>
-                  <TableHead className="text-right font-serif text-brand-800">Attendance Status</TableHead>
+                  <TableHead className="w-16 font-serif text-brand-800 min-w-[40px]">#</TableHead>
+                  <TableHead className="font-serif text-brand-800 min-w-[130px]">Athlete</TableHead>
+                  <TableHead className="font-serif text-brand-800 min-w-[90px]">Position</TableHead>
+                  <TableHead className="font-serif text-brand-800 text-right min-w-[200px]">Attendance Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -409,8 +415,9 @@ export default function AttendancePage() {
                       <TableCell className="font-sans text-sm text-slate-600">
                         {player.position || 'Athlete'}
                       </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1.5">
+                      <TableCell>
+                        {/* Desktop: horizontal row. Mobile: vertical stack of full-width buttons. */}
+                        <div className="hidden sm:flex items-center justify-end gap-1.5">
                           {STATUS_OPTIONS.map((st) => {
                             const isSelected = currentSt === st
                             let style = 'bg-surface text-slate-600 border-border hover:bg-surface/80'
@@ -432,6 +439,30 @@ export default function AttendancePage() {
                             )
                           })}
                         </div>
+                        {/* Mobile: compact horizontal pills with abbreviated labels */}
+                        <div className="flex sm:hidden items-center justify-end gap-1">
+                          {STATUS_OPTIONS.map((st) => {
+                            const isSelected = currentSt === st
+                            const abbrev = st === 'PRESENT' ? '✓' : st === 'LATE' ? '⏱' : st === 'ABSENT' ? '✕' : '—'
+                            let style = 'bg-surface text-slate-500 border-border'
+                            if (isSelected) {
+                              if (st === 'PRESENT') style = 'bg-emerald-600 text-white border-emerald-700'
+                              else if (st === 'LATE') style = 'bg-amber-500 text-white border-amber-600'
+                              else if (st === 'ABSENT') style = 'bg-rose-600 text-white border-rose-700'
+                              else if (st === 'EXCUSED') style = 'bg-indigo-600 text-white border-indigo-700'
+                            }
+                            return (
+                              <button
+                                key={st}
+                                type="button"
+                                onClick={() => setStatus(player.id, st)}
+                                className={`px-1.5 py-0.5 text-[10px] font-mono font-medium rounded border transition-all ${style}`}
+                              >
+                                {abbrev}
+                              </button>
+                            )
+                          })}
+                        </div>
                       </TableCell>
                     </TableRow>
                   )
@@ -439,14 +470,14 @@ export default function AttendancePage() {
               </TableBody>
             </Table>
 
-            <div className="p-4 bg-surface border-t border-border flex items-center justify-between">
+            <div className="p-3 sm:p-4 bg-surface border-t border-border flex items-center justify-between">
               <span className="text-xs font-mono text-slate-500">
                 {players.length} athletes marked
               </span>
               <Button
                 onClick={handleSaveAttendance}
                 disabled={bulkSubmit.isPending}
-                className="bg-accent hover:bg-accent-light text-white font-sans text-xs"
+                className="bg-accent hover:bg-accent-light text-white font-sans text-xs h-7"
               >
                 {bulkSubmit.isPending ? 'Saving…' : 'Save Attendance'}
               </Button>
@@ -457,7 +488,7 @@ export default function AttendancePage() {
 
       {/* SCHEDULE SESSION DIALOG */}
       <Dialog open={createSessionOpen} onOpenChange={setCreateSessionOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md w-[calc(100vw-1rem)] max-h-[85vh] overflow-y-auto">
           <form onSubmit={handleCreateSession}>
             <DialogHeader>
               <DialogTitle className="font-serif flex items-center gap-2">
@@ -559,7 +590,7 @@ export default function AttendancePage() {
 
       {/* DELETE SESSION DIALOG */}
       <Dialog open={deleteSessionDialog.open} onOpenChange={(open) => setDeleteSessionDialog((prev) => ({ ...prev, open }))}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-w-sm w-[calc(100vw-1rem)] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-serif text-rose-600 flex items-center gap-2">
               <Trash2 className="h-5 w-5" />

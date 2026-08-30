@@ -10,6 +10,13 @@ export function usePlayers(sportId: number) {
   })
 }
 
+export function useAllPlayers() {
+  return useQuery({
+    queryKey: ['players', 'all'],
+    queryFn: () => api.get('/api/players').then((r) => r.data as Player[]),
+  })
+}
+
 export function usePlayer(id: number) {
   return useQuery({
     queryKey: ['players', id],
@@ -44,5 +51,35 @@ export function useDeletePlayer() {
     mutationFn: (id: number) => api.delete(`/api/players/${id}`),
     onSuccess: () =>
       qc.invalidateQueries({ predicate: (q) => q.queryKey.includes('players') }),
+  })
+}
+
+export interface CaptainResult {
+  captain: { id: number; username: string; fullName: string; email?: string }
+  temporaryPassword?: string
+  passwordNote?: string
+}
+
+export function usePromotePlayerToCaptain() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ sportId, playerId }: { sportId: number; playerId: number }) =>
+      api.post(`/api/sports/${sportId}/players/${playerId}/promote-captain`).then((r) => r.data as CaptainResult),
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: ['sports', variables.sportId, 'players'] })
+      qc.invalidateQueries({ queryKey: ['sports'] })
+    },
+  })
+}
+
+export function useDemoteCaptain() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ sportId, playerId }: { sportId: number; playerId: number }) =>
+      api.post(`/api/sports/${sportId}/players/${playerId}/demote`),
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: ['sports', variables.sportId, 'players'] })
+      qc.invalidateQueries({ queryKey: ['sports'] })
+    },
   })
 }

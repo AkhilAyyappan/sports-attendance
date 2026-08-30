@@ -33,8 +33,8 @@ import {
 } from '@/components/ui/dialog'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
-import { useSports, useMySports, usePlayers, usePlayerAttendance, usePlayerAttendanceSummary, useAddPlayer, useDeletePlayer, useAuth } from '@/hooks'
-import { UserPlus, Trophy, Shield, Phone, Mail, FileText, User, Trash2 } from 'lucide-react'
+import { useSports, useMySports, usePlayers, usePlayerAttendance, usePlayerAttendanceSummary, useAddPlayer, useDeletePlayer, useUpdatePlayer, useAuth } from '@/hooks'
+import { UserPlus, Trophy, Shield, Phone, Mail, FileText, User, Trash2, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import { type Player } from '@/types'
 
@@ -55,6 +55,19 @@ export default function RosterPage() {
   const [deletePlayerDialog, setDeletePlayerDialog] = useState<{ open: boolean; player: Player | null }>({
     open: false,
     player: null,
+  })
+  const [editPlayerDialog, setEditPlayerDialog] = useState<{ open: boolean; player: Player | null }>({
+    open: false,
+    player: null,
+  })
+  const [editPlayerForm, setEditPlayerForm] = useState({
+    fullName: '',
+    dateOfBirth: '',
+    jerseyNumber: '',
+    position: '',
+    phone: '',
+    email: '',
+    notes: '',
   })
 
   const [playerForm, setPlayerForm] = useState({
@@ -79,6 +92,7 @@ export default function RosterPage() {
   const { data: players = [], isLoading: playersLoading } = usePlayers(selectedSportId ?? 0)
   const addPlayerMutation = useAddPlayer()
   const deletePlayerMutation = useDeletePlayer()
+  const updatePlayerMutation = useUpdatePlayer()
 
   const handleAddPlayer = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -104,6 +118,46 @@ export default function RosterPage() {
       setPlayerForm({ fullName: '', jerseyNumber: '', position: '', phone: '', email: '', notes: '' })
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to add player.')
+    }
+  }
+
+  const openEditPlayer = (player: Player) => {
+    setEditPlayerDialog({ open: true, player })
+    setEditPlayerForm({
+      fullName: player.fullName,
+      dateOfBirth: player.dateOfBirth ?? '',
+      jerseyNumber: player.jerseyNumber?.toString() ?? '',
+      position: player.position ?? '',
+      phone: player.phone ?? '',
+      email: player.email ?? '',
+      notes: player.notes ?? '',
+    })
+  }
+
+  const handleUpdatePlayer = async () => {
+    const player = editPlayerDialog.player
+    if (!player) return
+    if (!editPlayerForm.fullName.trim()) {
+      toast.error('Full name is required.')
+      return
+    }
+    try {
+      await updatePlayerMutation.mutateAsync({
+        id: player.id,
+        data: {
+          fullName: editPlayerForm.fullName.trim(),
+          dateOfBirth: editPlayerForm.dateOfBirth || undefined,
+          jerseyNumber: editPlayerForm.jerseyNumber ? parseInt(editPlayerForm.jerseyNumber, 10) : undefined,
+          position: editPlayerForm.position || undefined,
+          phone: editPlayerForm.phone || undefined,
+          email: editPlayerForm.email || undefined,
+          notes: editPlayerForm.notes || undefined,
+        },
+      })
+      toast.success(`Athlete ${editPlayerForm.fullName} updated.`)
+      setEditPlayerDialog({ open: false, player: null })
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to update player.')
     }
   }
 
@@ -163,24 +217,30 @@ export default function RosterPage() {
           <span className="font-serif text-sm font-medium text-brand-800 whitespace-nowrap">
             {isCaptain ? 'Your Assigned Sport:' : 'Select Sport:'}
           </span>
-          <Select
-            value={selectedSportId?.toString() ?? ''}
-            onValueChange={(v) => {
-              setSelectedSportId(Number(v))
-              setSelectedPlayer(null)
-            }}
-          >
-            <SelectTrigger className="w-64 font-sans bg-surface">
-              <SelectValue placeholder={sports.length === 0 ? 'No sports assigned' : 'Choose a sport…'} />
-            </SelectTrigger>
-            <SelectContent>
-              {sports.map((sport) => (
-                <SelectItem key={sport.id} value={sport.id.toString()}>
-                  {sport.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {isCaptain ? (
+            <span className="font-sans text-sm font-semibold text-accent bg-accent/10 px-3 py-1.5 rounded-md">
+              {currentSport?.name || 'Loading…'}
+            </span>
+          ) : (
+            <Select
+              value={selectedSportId?.toString() ?? ''}
+              onValueChange={(v) => {
+                setSelectedSportId(Number(v))
+                setSelectedPlayer(null)
+              }}
+            >
+              <SelectTrigger className="w-64 font-sans bg-surface">
+                <SelectValue placeholder={sports.length === 0 ? 'No sports assigned' : 'Choose a sport…'} />
+              </SelectTrigger>
+              <SelectContent>
+                {sports.map((sport) => (
+                  <SelectItem key={sport.id} value={sport.id.toString()}>
+                    {sport.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
 
         {currentSport && (
@@ -222,78 +282,93 @@ export default function RosterPage() {
             </Button>
           </div>
         ) : (
-          <Table className="ledger-table">
-            <TableHeader>
-              <TableRow className="bg-surface hover:bg-surface border-b border-border">
-                <TableHead className="w-16 font-serif text-brand-800">#</TableHead>
-                <TableHead className="font-serif text-brand-800">Athlete Name</TableHead>
-                <TableHead className="font-serif text-brand-800">Position / Role</TableHead>
-                <TableHead className="font-serif text-brand-800">Contact</TableHead>
-                <TableHead className="font-serif text-brand-800">Status</TableHead>
-                <TableHead className="text-right font-serif text-brand-800">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {players.map((player) => (
-                <TableRow
-                  key={player.id}
-                  className="hover:bg-surface/50 cursor-pointer"
-                  onClick={() => setSelectedPlayer(player)}
-                >
-                  <TableCell className="font-mono text-sm font-semibold text-brand-800">
-                    {player.jerseyNumber ?? '—'}
-                  </TableCell>
-                  <TableCell>
-                    <div className="font-serif font-medium text-brand-900">{player.fullName}</div>
-                    {player.notes && <div className="text-xs text-slate-400 truncate max-w-xs">{player.notes}</div>}
-                  </TableCell>
-                  <TableCell className="font-sans text-sm text-slate-600">
-                    {player.position || '—'}
-                  </TableCell>
-                  <TableCell className="font-sans text-xs text-slate-600">
-                    <div>{player.email || '—'}</div>
-                    <div className="font-mono text-slate-400">{player.phone || '—'}</div>
-                  </TableCell>
-                  <TableCell>
-                    <StatusBadge status={player.active !== false ? 'ACTIVE' : 'INACTIVE'} />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1.5">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-xs h-7 text-accent hover:text-accent-light"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setSelectedPlayer(player)
-                        }}
-                      >
-                        View Profile
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-xs h-7 text-rose-600 hover:text-rose-700 hover:bg-rose-50 p-1.5"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setDeletePlayerDialog({ open: true, player })
-                        }}
-                        title="Delete Athlete"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </TableCell>
+          <div className="overflow-x-auto">
+            <Table className="ledger-table w-max">
+              <TableHeader>
+                <TableRow className="bg-surface hover:bg-surface border-b border-border">
+                  <TableHead className="w-16 font-serif text-brand-800 min-w-[40px]">#</TableHead>
+                  <TableHead className="font-serif text-brand-800 min-w-[140px]">Athlete Name</TableHead>
+                  <TableHead className="font-serif text-brand-800 min-w-[100px]">Position / Role</TableHead>
+                  <TableHead className="font-serif text-brand-800 min-w-[130px]">Contact</TableHead>
+                  <TableHead className="font-serif text-brand-800 min-w-[80px]">Status</TableHead>
+                  <TableHead className="font-serif text-brand-800 text-right min-w-[180px]">Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {players.map((player) => (
+                  <TableRow
+                    key={player.id}
+                    className="hover:bg-surface/50 cursor-pointer"
+                    onClick={() => setSelectedPlayer(player)}
+                  >
+                    <TableCell className="font-mono text-sm font-semibold text-brand-800">
+                      {player.jerseyNumber ?? '—'}
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-serif font-medium text-brand-900">{player.fullName}</div>
+                      {player.notes && <div className="text-xs text-slate-400 truncate max-w-xs">{player.notes}</div>}
+                    </TableCell>
+                    <TableCell className="font-sans text-sm text-slate-600">
+                      {player.position || '—'}
+                    </TableCell>
+                    <TableCell className="font-sans text-xs text-slate-600">
+                      <div>{player.email || '—'}</div>
+                      <div className="font-mono text-slate-400">{player.phone || '—'}</div>
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge status={player.active !== false ? 'ACTIVE' : 'INACTIVE'} />
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-1.5">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-xs h-7 text-accent hover:text-accent-light w-full sm:w-auto"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setSelectedPlayer(player)
+                          }}
+                        >
+                          View Profile
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-xs h-7 text-accent hover:text-accent-light p-1.5 w-full sm:w-auto"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            openEditPlayer(player)
+                          }}
+                          title="Edit Athlete"
+                        >
+                          <Pencil className="h-3.5 w-3.5 sm:mr-1" />
+                          <span className="hidden sm:inline">Edit</span>
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-xs h-7 text-rose-600 hover:text-rose-700 hover:bg-rose-50 p-1.5 w-full sm:w-auto"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setDeletePlayerDialog({ open: true, player })
+                          }}
+                          title="Delete Athlete"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         )}
       </div>
 
       {/* REGISTER PLAYER DIALOG */}
       <Dialog open={addPlayerOpen} onOpenChange={setAddPlayerOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md w-[calc(100vw-1rem)] max-h-[85vh] overflow-y-auto">
           <form onSubmit={handleAddPlayer}>
             <DialogHeader>
               <DialogTitle className="font-serif flex items-center gap-2">
@@ -379,9 +454,110 @@ export default function RosterPage() {
         </DialogContent>
       </Dialog>
 
+      {/* EDIT PLAYER DIALOG */}
+      <Dialog open={editPlayerDialog.open} onOpenChange={(open) => {
+        if (!open) setEditPlayerDialog({ open: false, player: null })
+      }}>
+        <DialogContent className="max-w-md w-[calc(100vw-1rem)] max-h-[85vh] overflow-y-auto">
+          <form onSubmit={handleUpdatePlayer}>
+            <DialogHeader>
+              <DialogTitle className="font-serif flex items-center gap-2">
+                <Pencil className="h-5 w-5 text-accent" />
+                Edit Athlete
+              </DialogTitle>
+              <DialogDescription>
+                Update details for <strong>{editPlayerDialog.player?.fullName}</strong>.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3.5 my-4">
+              <div className="space-y-1">
+                <Label htmlFor="editRosterFullName" className="text-xs font-sans text-slate-700">Full Name *</Label>
+                <Input
+                  id="editRosterFullName"
+                  value={editPlayerForm.fullName}
+                  onChange={(e) => setEditPlayerForm({ ...editPlayerForm, fullName: e.target.value })}
+                  required
+                  className="h-8 text-xs font-sans"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="editRosterDob" className="text-xs font-sans text-slate-700">Date of Birth</Label>
+                  <Input
+                    id="editRosterDob"
+                    type="date"
+                    value={editPlayerForm.dateOfBirth}
+                    onChange={(e) => setEditPlayerForm({ ...editPlayerForm, dateOfBirth: e.target.value })}
+                    className="h-8 text-xs font-sans"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="editRosterJersey" className="text-xs font-sans text-slate-700">Jersey Number</Label>
+                  <Input
+                    id="editRosterJersey"
+                    value={editPlayerForm.jerseyNumber}
+                    onChange={(e) => setEditPlayerForm({ ...editPlayerForm, jerseyNumber: e.target.value })}
+                    className="h-8 text-xs font-sans"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="editRosterPosition" className="text-xs font-sans text-slate-700">Position</Label>
+                  <Input
+                    id="editRosterPosition"
+                    value={editPlayerForm.position}
+                    onChange={(e) => setEditPlayerForm({ ...editPlayerForm, position: e.target.value })}
+                    placeholder="e.g. Striker, Bowler"
+                    className="h-8 text-xs font-sans"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="editRosterPhone" className="text-xs font-sans text-slate-700">Phone</Label>
+                  <Input
+                    id="editRosterPhone"
+                    value={editPlayerForm.phone}
+                    onChange={(e) => setEditPlayerForm({ ...editPlayerForm, phone: e.target.value })}
+                    className="h-8 text-xs font-sans"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="editRosterEmail" className="text-xs font-sans text-slate-700">Email</Label>
+                <Input
+                  id="editRosterEmail"
+                  type="email"
+                  value={editPlayerForm.email}
+                  onChange={(e) => setEditPlayerForm({ ...editPlayerForm, email: e.target.value })}
+                  className="h-8 text-xs font-sans"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="editRosterNotes" className="text-xs font-sans text-slate-700">Notes</Label>
+                <Input
+                  id="editRosterNotes"
+                  value={editPlayerForm.notes}
+                  onChange={(e) => setEditPlayerForm({ ...editPlayerForm, notes: e.target.value })}
+                  placeholder="Any additional notes…"
+                  className="h-8 text-xs font-sans"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditPlayerDialog({ open: false, player: null })}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={updatePlayerMutation.isPending} className="bg-accent hover:bg-accent-light text-white font-sans text-xs">
+                {updatePlayerMutation.isPending ? 'Saving…' : 'Save Changes'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       {/* DELETE PLAYER CONFIRMATION */}
       <Dialog open={deletePlayerDialog.open} onOpenChange={(open) => setDeletePlayerDialog((prev) => ({ ...prev, open }))}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-w-sm w-[calc(100vw-1rem)] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-serif text-rose-600 flex items-center gap-2">
               <Trash2 className="h-5 w-5" />
@@ -408,7 +584,7 @@ export default function RosterPage() {
 
       {/* PLAYER DETAILS SHEET */}
       <Sheet open={!!selectedPlayer} onOpenChange={(open) => !open && setSelectedPlayer(null)}>
-        <SheetContent className="w-[400px] sm:w-[500px]">
+        <SheetContent className="w-[85vw] sm:w-[400px]">
           {selectedPlayer && (
             <div className="space-y-6 pt-6">
               <SheetHeader>

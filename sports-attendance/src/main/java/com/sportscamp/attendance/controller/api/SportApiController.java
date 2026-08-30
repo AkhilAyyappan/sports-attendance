@@ -53,7 +53,9 @@ public class SportApiController {
         if (auth != null && auth.isAuthenticated()) {
             User user = userService.findByUsername(auth.getName());
             if (user.getRole() == User.Role.ROLE_CAPTAIN) {
-                if (sport.getCaptain() == null || !sport.getCaptain().getId().equals(user.getId())) {
+                boolean isCaptain = sport.getCaptains().stream()
+                        .anyMatch(c -> c.getId().equals(user.getId()));
+                if (!isCaptain) {
                     return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
                 }
             }
@@ -97,7 +99,10 @@ public class SportApiController {
         return sportService.update(id, sport);
     }
 
-    /** POST /api/sports/{id}/captain  body: {"captainId": 2} */
+    /**
+     * POST /api/sports/{id}/captain  body: {"captainId": 2}
+     * Adds one captain to the sport. Fails if the sport already has 3 captains.
+     */
     @PostMapping("/{id}/captain")
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<?> assignCaptain(@PathVariable Long id, @RequestBody Map<String, Object> body) {
@@ -111,8 +116,25 @@ public class SportApiController {
             return ResponseEntity.ok(sport);
         } catch (ResourceNotFoundException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage()));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    /**
+     * DELETE /api/sports/{id}/captain/{captainId}
+     * Removes one captain from the sport.
+     */
+    @DeleteMapping("/{id}/captain/{captainId}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public ResponseEntity<?> removeCaptain(@PathVariable Long id, @PathVariable Long captainId) {
+        try {
+            Sport sport = sportService.removeCaptain(id, captainId);
+            return ResponseEntity.ok(sport);
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", e.getMessage()));
         }
     }
 

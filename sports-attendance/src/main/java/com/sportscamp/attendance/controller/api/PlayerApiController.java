@@ -14,7 +14,9 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api")
@@ -28,13 +30,13 @@ public class PlayerApiController {
     private boolean isCaptainOfSport(User user, Long sportId) {
         if (user.getRole() == User.Role.ROLE_ADMIN) return true;
         Sport sport = sportService.findById(sportId);
-        return sport.getCaptain() != null && sport.getCaptain().getId().equals(user.getId());
+        return sport.hasCaptain(user);
     }
 
     private boolean isCaptainOfPlayer(User user, Player player) {
         if (user.getRole() == User.Role.ROLE_ADMIN) return true;
-        if (player.getSport() == null || player.getSport().getCaptain() == null) return false;
-        return player.getSport().getCaptain().getId().equals(user.getId());
+        if (player.getSport() == null) return false;
+        return player.getSport().hasCaptain(user);
     }
 
     /** GET /api/sports/{sportId}/players */
@@ -47,6 +49,23 @@ public class PlayerApiController {
             }
         }
         return ResponseEntity.ok(playerService.findAllBySport(sportId));
+    }
+
+    /** GET /api/players — all players across all sports (admin + captains) */
+    @GetMapping("/players")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_CAPTAIN')")
+    public ResponseEntity<List<Player>> listAll(Authentication auth) {
+        if (auth != null && auth.isAuthenticated()) {
+            User me = userService.findByUsername(auth.getName());
+            if (me.getRole() == User.Role.ROLE_CAPTAIN) {
+                // captains can only see players from their own sports
+                List<Sport> mySports = sportService.findByCaptainUsername(me.getUsername());
+                List<Long> sportIds = mySports.stream().map(Sport::getId).toList();
+                if (sportIds.isEmpty()) return ResponseEntity.ok(List.of());
+                return ResponseEntity.ok(playerService.findAllBySports(sportIds));
+            }
+        }
+        return ResponseEntity.ok(playerService.findAllPlayers());
     }
 
     /** GET /api/players/{id} */
@@ -101,6 +120,54 @@ public class PlayerApiController {
             throw new AccessDeniedException("You are not authorized to delete this player.");
         }
         playerService.delete(id);
+    }
+
+    /**
+     * POST /api/sports/{sportId}/players/{playerId}/promote-captain
+     * Promotes the given player to captain: creates a User account (ROLE_CAPTAIN) if needed
+     * and adds them to the sport's captains list.
+     */
+    @PostMapping("/sports/{sportId}/players/{playerId}/promote-captain")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public ResponseEntity<?> promoteToCaptain(
+            @PathVariable Long sportId,
+            @PathVariable Long playerId,
+            Authentication auth) {
+        User me = userService.findByUsername(auth.getName());
+        Player player = playerService.findById(playerId);
+        if (!isCaptainOfPlayer(me, player)) {
+            throw new AccessDeniedException("You are not authorized to manage this player.");
+        }
+        User captain = playerService.promoteToCaptain(playerId, userService, sportService);
+        String tempPassword = playerService.getLastCreatedPassword();
+        Map<String, Object> result = new java.util.HashMap<>();
+        result.put("captain", captain);
+        if (tempPassword != null) {
+            result.put("temporaryPassword", tempPassword);
+            result.put("passwordNote", "A new captain account was created. Share this temporary password with the captain.");
+        } else {
+            result.put("passwordNote", "This player already had a captain account — no new password generated.");
+        }
+        return ResponseEntity.ok(result);
+    }
+
+    /**
+     * POST /api/sports/{sportId}/players/{playerId}/demote
+     * Removes the player's associated user from the sport's captains list.
+     */
+    @PostMapping("/sports/{sportId}/players/{playerId}/demote")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public ResponseEntity<Void> demote(
+            @PathVariable Long sportId,
+            @PathVariable Long playerId,
+            Authentication auth) {
+        User me = userService.findByUsername(auth.getName());
+        Player player = playerService.findById(playerId);
+        if (!isCaptainOfPlayer(me, player)) {
+            throw new AccessDeniedException("You are not authorized to manage this player.");
+        }
+        playerService.demoteFromCaptain(playerId, sportService);
+        return ResponseEntity.noContent().build();
     }
 }
 

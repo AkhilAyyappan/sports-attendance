@@ -6,6 +6,7 @@ export {
   useCreateSport,
   useUpdateSport,
   useAssignCaptainToSport,
+  useRemoveCaptainFromSport,
   useDeleteSport,
 } from './useSports'
 export {
@@ -14,6 +15,7 @@ export {
   useResetPassword,
   useToggleCaptain,
   useDeleteCaptain,
+  useUpdateCaptain,
 } from './useCaptains'
 export {
   usePlayers,
@@ -21,6 +23,9 @@ export {
   useAddPlayer,
   useUpdatePlayer,
   useDeletePlayer,
+  usePromotePlayerToCaptain,
+  useDemoteCaptain,
+  useAllPlayers,
 } from './usePlayers'
 export {
   useSessions,

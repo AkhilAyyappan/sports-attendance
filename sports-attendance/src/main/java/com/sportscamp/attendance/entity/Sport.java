@@ -10,8 +10,7 @@ import java.util.List;
 
 /**
  * A sport program (e.g. Football, Cricket, Basketball, Athletics).
- * Each sport directly has an assigned captain/coach, players, and training sessions.
- * Multiple sports can be managed by the same captain.
+ * Each sport can have up to 3 captains who manage players, sessions, and attendance.
  */
 @Entity
 @Table(name = "sports",
@@ -39,13 +38,18 @@ public class Sport extends BaseEntity {
     private boolean active = true;
 
     /**
-     * Assigned Captain/Coach for this sport program.
-     * Many sports can have the same captain.
+     * Captains/coaches for this sport. Maximum of 3 captains allowed.
+     * Many captains can be assigned to many sports.
      */
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "captain_id")
-    @JsonIgnoreProperties({"hibernateLazyInitializer"})
-    private User captain;
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+        name = "sport_captains",
+        joinColumns = @JoinColumn(name = "sport_id"),
+        inverseJoinColumns = @JoinColumn(name = "captain_id")
+    )
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    @Builder.Default
+    private List<User> captains = new ArrayList<>();
 
     @JsonIgnore
     @OneToMany(mappedBy = "sport", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
@@ -56,4 +60,20 @@ public class Sport extends BaseEntity {
     @OneToMany(mappedBy = "sport", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default
     private List<TrainingSession> trainingSessions = new ArrayList<>();
+
+    /**
+     * Check if a user is one of the captains of this sport.
+     */
+    public boolean hasCaptain(User user) {
+        if (user == null) return false;
+        return captains != null && captains.stream().anyMatch(c -> c.getId().equals(user.getId()));
+    }
+
+    /**
+     * Get the first captain, or null if no captains assigned.
+     */
+    public User getPrimaryCaptain() {
+        if (captains == null || captains.isEmpty()) return null;
+        return captains.get(0);
+    }
 }

@@ -19,4 +19,7 @@ public interface PlayerRepository extends JpaRepository<Player, Long> {
 
     @Query("SELECT COUNT(p) FROM Player p WHERE p.sport.id = :sportId AND p.active = true")
     long countBySportIdAndActiveTrue(@Param("sportId") Long sportId);
+
+    @Query("SELECT p FROM Player p WHERE p.sport.id IN :sportIds")
+    List<Player> findBySportIdIn(@Param("sportIds") List<Long> sportIds);
 }

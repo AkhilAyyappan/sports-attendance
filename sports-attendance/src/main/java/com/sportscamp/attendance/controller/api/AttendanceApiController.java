@@ -33,14 +33,14 @@ public class AttendanceApiController {
 
     private boolean isCaptainOfSession(User user, TrainingSession session) {
         if (user.getRole() == User.Role.ROLE_ADMIN) return true;
-        if (session.getSport() == null || session.getSport().getCaptain() == null) return false;
-        return session.getSport().getCaptain().getId().equals(user.getId());
+        if (session.getSport() == null) return false;
+        return session.getSport().hasCaptain(user);
     }
 
     private boolean isCaptainOfPlayer(User user, Player player) {
         if (user.getRole() == User.Role.ROLE_ADMIN) return true;
-        if (player.getSport() == null || player.getSport().getCaptain() == null) return false;
-        return player.getSport().getCaptain().getId().equals(user.getId());
+        if (player.getSport() == null) return false;
+        return player.getSport().hasCaptain(user);
     }
 
     /** GET /api/sessions/{sessionId}/attendance */

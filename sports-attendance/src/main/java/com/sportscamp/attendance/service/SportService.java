@@ -16,10 +16,12 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class SportService {
 
+    private static final int MAX_CAPTAINS_PER_SPORT = 3;
+
     private final SportRepository sportRepository;
 
     public List<Sport> findAll() {
-        return sportRepository.findAllWithCaptain();
+        return sportRepository.findAllWithCaptains();
     }
 
     public List<Sport> findAllActive() {
@@ -27,7 +29,7 @@ public class SportService {
     }
 
     public Sport findById(Long id) {
-        return sportRepository.findByIdWithCaptain(id)
+        return sportRepository.findByIdWithCaptains(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Sport", id));
     }
 
@@ -56,10 +58,31 @@ public class SportService {
         return sportRepository.save(existing);
     }
 
+    /**
+     * Add a captain to a sport. Fails if the sport already has 3 captains.
+     */
     @Transactional
     public Sport assignCaptain(Long sportId, User captain) {
         Sport sport = findById(sportId);
-        sport.setCaptain(captain);
+        if (sport.getCaptains().size() >= MAX_CAPTAINS_PER_SPORT) {
+            throw new IllegalStateException(
+                    "Sport \"" + sport.getName() + "\" already has " + MAX_CAPTAINS_PER_SPORT
+                    + " captains. Remove one before adding another.");
+        }
+        if (sport.getCaptains().contains(captain)) {
+            return sport;
+        }
+        sport.getCaptains().add(captain);
+        return sportRepository.save(sport);
+    }
+
+    /**
+     * Remove a captain from a sport.
+     */
+    @Transactional
+    public Sport removeCaptain(Long sportId, Long captainId) {
+        Sport sport = findById(sportId);
+        sport.getCaptains().removeIf(c -> c.getId().equals(captainId));
         return sportRepository.save(sport);
     }
 

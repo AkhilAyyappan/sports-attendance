@@ -107,6 +107,17 @@ public class UserApiController {
         return ResponseEntity.noContent().build();
     }
 
+    /** PATCH /api/users/{id} — update fullName, email, phone */
+    @PatchMapping("/{id}")
+    public ResponseEntity<User> updateUser(@PathVariable Long id,
+                                           @RequestBody Map<String, String> body) {
+        String fullName = body.get("fullName");
+        String email = body.get("email");
+        String phone = body.get("phone");
+        User updated = userService.updateUser(id, fullName, email, phone);
+        return ResponseEntity.ok(updated);
+    }
+
     /** DELETE /api/users/{id} */
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)

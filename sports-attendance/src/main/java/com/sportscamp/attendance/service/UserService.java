@@ -29,6 +29,15 @@ public class UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + username));
     }
 
+    public User findUserByEmail(String email) {
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + email));
+    }
+
+    public boolean userExistsByEmail(String email) {
+        return userRepository.existsByEmail(email);
+    }
+
     public List<User> findCaptains() {
         return userRepository.findByRole(User.Role.ROLE_CAPTAIN);
     }
@@ -73,5 +82,20 @@ public class UserService {
     public void deleteUser(Long userId) {
         User user = findById(userId);
         userRepository.delete(user);
+    }
+
+    @Transactional
+    public User updateUser(Long userId, String fullName, String email, String phone) {
+        User user = findById(userId);
+        if (fullName != null && !fullName.isBlank()) {
+            user.setFullName(fullName.trim());
+        }
+        if (email != null) {
+            user.setEmail(email.isBlank() ? null : email.trim());
+        }
+        if (phone != null) {
+            user.setPhone(phone.isBlank() ? null : phone.trim());
+        }
+        return userRepository.save(user);
     }
 }

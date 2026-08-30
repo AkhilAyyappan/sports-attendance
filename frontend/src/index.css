@@ -48,6 +48,59 @@ body {
   border-radius: 4px;
 }
 
+/* Responsive card-table: on small screens each row becomes a card */
+@media (max-width: 639px) {
+  .card-table thead {
+    display: none;
+  }
+  .card-table tbody,
+  .card-table tr,
+  .card-table td {
+    display: block;
+    width: 100%;
+  }
+  .card-table tr {
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: 0.5rem;
+    background: var(--color-card);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .card-table td {
+    padding: 0.3rem 0;
+    border: none;
+    text-align: left;
+    position: relative;
+    padding-left: 45%;
+  }
+  .card-table td:before {
+    content: attr(data-label);
+    position: absolute;
+    left: 0;
+    width: 42%;
+    padding-right: 0.5rem;
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-brand-700);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  /* Keep action-cell buttons stacked vertically on mobile */
+  .card-table td[data-label*="Action"],
+  .card-table td[data-label="Actions"] {
+    padding-left: 0;
+    padding-top: 0.75rem;
+  }
+  .card-table td[data-label*="Action"]:before,
+  .card-table td[data-label="Actions"]:before {
+    display: none;
+  }
+}
+
 /* Scrollbar refinement for sheets */
 .sheet-content::-webkit-scrollbar {
   width: 6px;

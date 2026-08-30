@@ -45,3 +45,15 @@ export function useDeleteCaptain() {
     },
   })
 }
+
+export function useUpdateCaptain() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: { fullName: string; email?: string; phone?: string } }) =>
+      api.patch(`/api/users/${id}`, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['captains'] })
+      qc.invalidateQueries({ queryKey: ['sports'] })
+    },
+  })
+}

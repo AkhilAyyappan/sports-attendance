@@ -68,3 +68,15 @@ export function useDeleteSport() {
     },
   })
 }
+
+export function useRemoveCaptainFromSport() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ sportId, captainId }: { sportId: number; captainId: number }) =>
+      api.delete(`/api/sports/${sportId}/captain/${captainId}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['sports'] })
+      qc.invalidateQueries({ queryKey: ['captains'] })
+    },
+  })
+}

@@ -30,13 +30,13 @@ public class SessionApiController {
     private boolean isCaptainOfSport(User user, Long sportId) {
         if (user.getRole() == User.Role.ROLE_ADMIN) return true;
         Sport sport = sportService.findById(sportId);
-        return sport.getCaptain() != null && sport.getCaptain().getId().equals(user.getId());
+        return sport.hasCaptain(user);
     }
 
     private boolean isCaptainOfSession(User user, TrainingSession session) {
         if (user.getRole() == User.Role.ROLE_ADMIN) return true;
-        if (session.getSport() == null || session.getSport().getCaptain() == null) return false;
-        return session.getSport().getCaptain().getId().equals(user.getId());
+        if (session.getSport() == null) return false;
+        return session.getSport().hasCaptain(user);
     }
 
     /** GET /api/sessions — all sessions (scoped to captain's assigned sports if captain) */

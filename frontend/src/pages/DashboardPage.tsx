@@ -48,7 +48,7 @@ export default function DashboardPage() {
           <h1 className="font-serif text-2xl font-semibold text-brand-900">Executive Overview</h1>
           <p className="text-slate-500 text-sm font-sans mt-1">Sports programs and training sessions</p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
             <LoadingSkeleton key={i} type="stat" />
           ))}
@@ -104,20 +104,20 @@ export default function DashboardPage() {
             {isCaptain ? 'Your Scheduled Training Sessions' : 'Upcoming Training Sessions'}
           </h2>
         </div>
-        <div className="p-0">
+        <div className="p-0 overflow-x-auto">
           {upcomingSessions.length === 0 ? (
             <div className="px-6 py-12 text-center">
               <p className="text-slate-400 font-sans text-sm">No upcoming training sessions scheduled.</p>
             </div>
           ) : (
-            <Table className="ledger-table">
+            <Table className="ledger-table w-max">
               <TableHeader>
                 <TableRow className="bg-surface hover:bg-surface border-b border-border">
-                  <TableHead className="font-serif text-brand-800">Session Title</TableHead>
-                  <TableHead className="font-serif text-brand-800">Sport Discipline</TableHead>
-                  <TableHead className="font-serif text-brand-800">Date</TableHead>
-                  <TableHead className="font-serif text-brand-800">Time</TableHead>
-                  <TableHead className="font-serif text-brand-800">Status</TableHead>
+                  <TableHead className="font-serif text-brand-800 min-w-[180px]">Session Title</TableHead>
+                  <TableHead className="font-serif text-brand-800 min-w-[120px]">Sport Discipline</TableHead>
+                  <TableHead className="font-serif text-brand-800 min-w-[100px]">Date</TableHead>
+                  <TableHead className="font-serif text-brand-800 min-w-[100px]">Time</TableHead>
+                  <TableHead className="font-serif text-brand-800 min-w-[80px]">Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
