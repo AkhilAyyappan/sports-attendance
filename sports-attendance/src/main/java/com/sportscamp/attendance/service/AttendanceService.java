@@ -25,11 +25,26 @@ public class AttendanceService {
     private final TrainingSessionService sessionService;
 
     public List<Attendance> findBySession(Long sessionId) {
-        return attendanceRepository.findBySessionId(sessionId);
+        return attendanceRepository.findBySession_Id(sessionId);
     }
 
     public List<Attendance> findByPlayer(Long playerId) {
-        return attendanceRepository.findByPlayerId(playerId);
+        return attendanceRepository.findByPlayer_Id(playerId);
+    }
+
+    public AttendanceStatus getLatestStatusForPlayer(Long playerId) {
+        return attendanceRepository.findTopByPlayer_IdOrderBySession_SessionDateDescMarkedAtDesc(playerId)
+                .map(Attendance::getStatus)
+                .orElse(AttendanceStatus.ABSENT);
+    }
+
+    public Map<String, Long> getCountsByPlayer(Long playerId) {
+        Map<String, Long> result = new java.util.HashMap<>();
+        result.put("present", countPresent(playerId));
+        result.put("absent", countAbsent(playerId));
+        result.put("late", countLate(playerId));
+        result.put("excused", countExcused(playerId));
+        return result;
     }
 
     public List<Attendance> findBySportAndSession(Long sportId, Long sessionId) {
@@ -43,7 +58,7 @@ public class AttendanceService {
         for (Map.Entry<Long, AttendanceStatus> entry : playerStatusMap.entrySet()) {
             Player player = playerService.findById(entry.getKey());
             Attendance attendance = attendanceRepository
-                    .findByPlayerIdAndSessionId(player.getId(), session.getId())
+                    .findByPlayer_IdAndSession_Id(player.getId(), session.getId())
                     .orElseGet(() -> Attendance.builder()
                             .player(player)
                             .session(session)
@@ -66,7 +81,27 @@ public class AttendanceService {
         return attendanceRepository.save(attendance);
     }
 
+    public long countByPlayerIdAndStatus(Long playerId, AttendanceStatus status) {
+        return attendanceRepository.countByPlayerIdAndStatus(playerId, status);
+    }
+
     public long countPresent(Long playerId) {
-        return attendanceRepository.countByPlayerIdAndStatus(playerId, AttendanceStatus.PRESENT);
+        return countByPlayerIdAndStatus(playerId, AttendanceStatus.PRESENT);
+    }
+
+    public long countAbsent(Long playerId) {
+        return countByPlayerIdAndStatus(playerId, AttendanceStatus.ABSENT);
+    }
+
+    public long countLate(Long playerId) {
+        return countByPlayerIdAndStatus(playerId, AttendanceStatus.LATE);
+    }
+
+    public long countExcused(Long playerId) {
+        return countByPlayerIdAndStatus(playerId, AttendanceStatus.EXCUSED);
+    }
+
+    public long countTotalSessionsByPlayer(Long playerId) {
+        return attendanceRepository.countByPlayerId(playerId);
     }
 }

@@ -13,11 +13,11 @@ import java.util.List;
 public interface TrainingSessionRepository extends JpaRepository<TrainingSession, Long> {
 
     @Query("SELECT ts FROM TrainingSession ts LEFT JOIN FETCH ts.sport WHERE ts.sport.id = :sportId ORDER BY ts.sessionDate ASC, ts.startTime ASC")
-    List<TrainingSession> findBySportIdOrderBySessionDateAsc(@Param("sportId") Long sportId);
+    List<TrainingSession> findBySport_IdOrderBySessionDateAsc(@Param("sportId") Long sportId);
 
     @Query("SELECT ts FROM TrainingSession ts LEFT JOIN FETCH ts.sport ORDER BY ts.sessionDate ASC, ts.startTime ASC")
     List<TrainingSession> findAllWithSport();
 
-    List<TrainingSession> findBySportIdAndSessionDateBetween(
+    List<TrainingSession> findBySport_IdAndSessionDateBetween(
             Long sportId, LocalDate from, LocalDate to);
 }

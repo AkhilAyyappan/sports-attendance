@@ -1,14 +1,14 @@
 spring:
   datasource:
-    # Transaction pooler — username includes project ref
-    url: 
-    password: 
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
 
   flyway:
-    # prepareThreshold=0 disables server-side prepared statements
-    # Required for Supabase PgBouncer pooler in transaction mode
-    url: 
-    password: 
+    url: ${FLYWAY_URL}
+    user: ${FLYWAY_USERNAME}
+    password: ${DB_PASSWORD}
 
   jpa:
     show-sql: true

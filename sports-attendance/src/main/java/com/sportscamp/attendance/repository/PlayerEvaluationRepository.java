@@ -10,7 +10,7 @@ import java.util.Optional;
 @Repository
 public interface PlayerEvaluationRepository extends JpaRepository<PlayerEvaluation, Long> {
 
-    List<PlayerEvaluation> findByPlayerId(Long playerId);
+    List<PlayerEvaluation> findByPlayer_Id(Long playerId);
 
-    Optional<PlayerEvaluation> findByPlayerIdAndSessionId(Long playerId, Long sessionId);
+    Optional<PlayerEvaluation> findByPlayer_IdAndSession_Id(Long playerId, Long sessionId);
 }

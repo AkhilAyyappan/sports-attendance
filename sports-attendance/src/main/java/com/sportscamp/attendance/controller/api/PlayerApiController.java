@@ -3,6 +3,7 @@ package com.sportscamp.attendance.controller.api;
 import com.sportscamp.attendance.entity.Player;
 import com.sportscamp.attendance.entity.Sport;
 import com.sportscamp.attendance.entity.User;
+import com.sportscamp.attendance.service.AttendanceService;
 import com.sportscamp.attendance.service.PlayerService;
 import com.sportscamp.attendance.service.SportService;
 import com.sportscamp.attendance.service.UserService;
@@ -15,6 +16,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api")
@@ -24,6 +26,7 @@ public class PlayerApiController {
     private final PlayerService playerService;
     private final UserService userService;
     private final SportService sportService;
+    private final AttendanceService attendanceService;
 
     private boolean isCaptainOfSport(User user, Long sportId) {
         if (user.getRole() == User.Role.ROLE_ADMIN) return true;
@@ -46,7 +49,18 @@ public class PlayerApiController {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
             }
         }
-        return ResponseEntity.ok(playerService.findAllBySport(sportId));
+
+        List<Player> players = playerService.findAllBySport(sportId);
+        players.forEach(player -> {
+            player.setAttendanceStatus(attendanceService.getLatestStatusForPlayer(player.getId()));
+            Map<String, Long> counts = attendanceService.getCountsByPlayer(player.getId());
+            player.setPresentCount(counts.getOrDefault("present", 0L));
+            player.setAbsentCount(counts.getOrDefault("absent", 0L));
+            player.setLateCount(counts.getOrDefault("late", 0L));
+            player.setExcusedCount(counts.getOrDefault("excused", 0L));
+        });
+
+        return ResponseEntity.ok(players);
     }
 
     /** GET /api/players/{id} */

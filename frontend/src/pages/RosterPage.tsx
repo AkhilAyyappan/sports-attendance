@@ -229,7 +229,7 @@ export default function RosterPage() {
                 <TableHead className="font-serif text-brand-800">Athlete Name</TableHead>
                 <TableHead className="font-serif text-brand-800">Position / Role</TableHead>
                 <TableHead className="font-serif text-brand-800">Contact</TableHead>
-                <TableHead className="font-serif text-brand-800">Status</TableHead>
+                <TableHead className="font-serif text-brand-800">Attendance</TableHead>
                 <TableHead className="text-right font-serif text-brand-800">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -255,7 +255,7 @@ export default function RosterPage() {
                     <div className="font-mono text-slate-400">{player.phone || '—'}</div>
                   </TableCell>
                   <TableCell>
-                    <StatusBadge status={player.active !== false ? 'ACTIVE' : 'INACTIVE'} />
+                    <StatusBadge status={player.attendanceStatus ?? (player.active !== false ? 'ACTIVE' : 'INACTIVE')} />
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1.5">

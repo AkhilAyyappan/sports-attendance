@@ -13,10 +13,12 @@ import { StatCard } from '@/components/shared/StatCard'
 import { useSports, useMySports, useCaptains, useAllSessions } from '@/hooks'
 import { useAuth } from '@/hooks/useAuth'
 import { Trophy, ShieldCheck, Calendar, Activity } from 'lucide-react'
+import AdminPage from './AdminPage'
 
 export default function DashboardPage() {
   const { username, role } = useAuth()
   const isCaptain = role === 'ROLE_CAPTAIN'
+  const isAdmin = role === 'ROLE_ADMIN'
 
   const { data: allSports = [], isLoading: allSportsLoading } = useSports(!isCaptain)
   const { data: mySports = [], isLoading: mySportsLoading } = useMySports()
@@ -40,6 +42,27 @@ export default function DashboardPage() {
   const totalSports = sports.length
   const totalCaptains = captains.length
   const activeSports = sports.filter((s) => s.active).length
+
+  if (isAdmin) {
+    if (sportsLoading || captainsLoading || sessionsLoading) {
+      return (
+        <div className="space-y-6">
+          <div>
+            <h1 className="font-serif text-2xl font-semibold text-brand-900">Executive Overview</h1>
+            <p className="text-slate-500 text-sm font-sans mt-1">Sports programs and training sessions</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <LoadingSkeleton key={i} type="stat" />
+            ))}
+          </div>
+          <LoadingSkeleton type="table" count={5} />
+        </div>
+      )
+    }
+
+    return <AdminPage />
+  }
 
   if (sportsLoading || captainsLoading || sessionsLoading) {
     return (

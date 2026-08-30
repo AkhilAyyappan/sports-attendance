@@ -121,8 +121,32 @@ public class AttendanceApiController {
 
     /** GET /api/players/{playerId}/attendance/summary */
     @GetMapping("/players/{playerId}/attendance/summary")
-    public Map<String, Long> summary(@PathVariable Long playerId) {
-        return Map.of("presentCount", attendanceService.countPresent(playerId));
+    public Map<String, Object> summary(@PathVariable Long playerId, Authentication auth) {
+        Player player = playerService.findById(playerId);
+        long totalSessions = attendanceService.countTotalSessionsByPlayer(playerId);
+        long presentCount = attendanceService.countPresent(playerId);
+        long absentCount = attendanceService.countAbsent(playerId);
+        long lateCount = attendanceService.countLate(playerId);
+        long excusedCount = attendanceService.countExcused(playerId);
+        double attendanceRate = totalSessions == 0 ? 0.0 : (presentCount * 100.0) / totalSessions;
+
+        if (auth != null && auth.isAuthenticated()) {
+            User me = userService.findByUsername(auth.getName());
+            if (!isCaptainOfPlayer(me, player)) {
+                throw new AccessDeniedException("You are not authorized to view this player attendance summary.");
+            }
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("playerId", playerId);
+        result.put("playerFullName", player.getFullName());
+        result.put("totalSessions", totalSessions);
+        result.put("presentCount", presentCount);
+        result.put("absentCount", absentCount);
+        result.put("lateCount", lateCount);
+        result.put("excusedCount", excusedCount);
+        result.put("attendanceRate", Math.round(attendanceRate * 10.0) / 10.0);
+        return result;
     }
 }
 

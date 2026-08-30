@@ -19,11 +19,11 @@ public class PlayerService {
     private final SportService sportService;
 
     public List<Player> findActiveBySport(Long sportId) {
-        return playerRepository.findBySportIdAndActiveTrue(sportId);
+        return playerRepository.findBySport_IdAndActiveTrue(sportId);
     }
 
     public List<Player> findAllBySport(Long sportId) {
-        return playerRepository.findBySportId(sportId);
+        return playerRepository.findBySport_Id(sportId);
     }
 
     public Player findById(Long id) {

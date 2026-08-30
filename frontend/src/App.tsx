@@ -89,8 +89,22 @@ export default function App() {
         >
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<DashboardPage />} />
-          <Route path="roster" element={<RosterPage />} />
-          <Route path="attendance" element={<AttendancePage />} />
+          <Route
+            path="roster"
+            element={
+              <RoleGuard requiredRole={ROLES.CAPTAIN}>
+                <RosterPage />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="attendance"
+            element={
+              <RoleGuard requiredRole={ROLES.CAPTAIN}>
+                <AttendancePage />
+              </RoleGuard>
+            }
+          />
           <Route
             path="admin"
             element={

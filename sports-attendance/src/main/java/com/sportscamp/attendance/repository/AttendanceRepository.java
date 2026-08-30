@@ -13,11 +13,13 @@ import java.util.Optional;
 @Repository
 public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
 
-    List<Attendance> findBySessionId(Long sessionId);
+    List<Attendance> findBySession_Id(Long sessionId);
 
-    List<Attendance> findByPlayerId(Long playerId);
+    List<Attendance> findByPlayer_Id(Long playerId);
 
-    Optional<Attendance> findByPlayerIdAndSessionId(Long playerId, Long sessionId);
+    Optional<Attendance> findTopByPlayer_IdOrderBySession_SessionDateDescMarkedAtDesc(Long playerId);
+
+    Optional<Attendance> findByPlayer_IdAndSession_Id(Long playerId, Long sessionId);
 
     @Query("""
             SELECT a FROM Attendance a
@@ -36,6 +38,13 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
     long countByPlayerIdAndStatus(
             @Param("playerId") Long playerId,
             @Param("status") AttendanceStatus status);
+
+    @Query("""
+            SELECT COUNT(a) FROM Attendance a
+            WHERE a.player.id = :playerId
+            """)
+    long countByPlayerId(
+            @Param("playerId") Long playerId);
 
     @Query("""
             SELECT COUNT(a) FROM Attendance a

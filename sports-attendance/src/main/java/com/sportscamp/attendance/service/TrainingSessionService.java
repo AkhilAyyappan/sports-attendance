@@ -19,7 +19,7 @@ public class TrainingSessionService {
     private final SportService sportService;
 
     public List<TrainingSession> findBySport(Long sportId) {
-        return sessionRepository.findBySportIdOrderBySessionDateAsc(sportId);
+        return sessionRepository.findBySport_IdOrderBySessionDateAsc(sportId);
     }
 
     public List<TrainingSession> findAll() {

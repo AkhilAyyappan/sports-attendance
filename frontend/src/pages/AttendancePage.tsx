@@ -105,21 +105,33 @@ export default function AttendancePage() {
   const [playerStatuses, setPlayerStatuses] = useState<Map<number, AttendanceStatus>>(() => new Map())
 
   useEffect(() => {
-    const map = new Map<number, AttendanceStatus>()
+    const next = new Map<number, AttendanceStatus>()
     // Pre-populate with existing records from backend
     for (const rec of attendanceRecords) {
       const pId = rec.playerId ?? rec.player?.id
       if (pId != null) {
-        map.set(Number(pId), rec.status)
+        next.set(Number(pId), rec.status)
       }
     }
     // Default any remaining unrecorded players to PRESENT
     for (const p of players) {
-      if (!map.has(p.id)) {
-        map.set(p.id, 'PRESENT')
+      if (!next.has(p.id)) {
+        next.set(p.id, 'PRESENT')
       }
     }
-    setPlayerStatuses(map)
+
+    setPlayerStatuses((prev) => {
+      const prevEntries = Array.from(prev.entries())
+      const nextEntries = Array.from(next.entries())
+      const hasChanged =
+        prevEntries.length !== nextEntries.length ||
+        prevEntries.some(([key, value], index) => {
+          const [nextKey, nextValue] = nextEntries[index] ?? []
+          return nextKey !== key || nextValue !== value
+        })
+
+      return hasChanged ? next : prev
+    })
   }, [attendanceRecords, players, selectedSessionId])
 
   const setStatus = (playerId: number, status: AttendanceStatus) => {

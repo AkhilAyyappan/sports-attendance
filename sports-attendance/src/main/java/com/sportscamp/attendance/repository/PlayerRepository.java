@@ -9,9 +9,9 @@ import java.util.List;
 @Repository
 public interface PlayerRepository extends JpaRepository<Player, Long> {
 
-    List<Player> findBySportIdAndActiveTrue(Long sportId);
+    List<Player> findBySport_IdAndActiveTrue(Long sportId);
 
-    List<Player> findBySportId(Long sportId);
+    List<Player> findBySport_Id(Long sportId);
 
-    long countBySportIdAndActiveTrue(Long sportId);
+    long countBySport_IdAndActiveTrue(Long sportId);
 }

@@ -5,7 +5,6 @@ import {
   LayoutDashboard,
   Users,
   ClipboardList,
-  Settings,
   LogOut,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
@@ -19,9 +18,8 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: <LayoutDashboard className="h-4 w-4" /> },
-  { label: 'Roster', href: '/roster', icon: <Users className="h-4 w-4" /> },
-  { label: 'Attendance', href: '/attendance', icon: <ClipboardList className="h-4 w-4" /> },
-  { label: 'Admin', href: '/admin', icon: <Settings className="h-4 w-4" />, requiredRole: ROLES.ADMIN },
+  { label: 'Roster', href: '/roster', icon: <Users className="h-4 w-4" />, requiredRole: ROLES.CAPTAIN },
+  { label: 'Attendance', href: '/attendance', icon: <ClipboardList className="h-4 w-4" />, requiredRole: ROLES.CAPTAIN },
 ]
 
 export function Sidebar() {

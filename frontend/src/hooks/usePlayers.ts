@@ -23,8 +23,11 @@ export function useAddPlayer() {
   return useMutation({
     mutationFn: ({ sportId, data }: { sportId: number; data: Partial<Player> }) =>
       api.post(`/api/sports/${sportId}/players`, data),
-    onSuccess: (_data, variables) =>
-      qc.invalidateQueries({ queryKey: ['sports', variables.sportId, 'players'] }),
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: ['sports'] })
+      qc.invalidateQueries({ queryKey: ['sports', variables.sportId, 'players'] })
+      qc.invalidateQueries({ predicate: (q) => q.queryKey.includes('players') })
+    },
   })
 }
 

@@ -13,8 +13,7 @@ import java.util.List;
  * An athlete registered in a sport program.
  */
 @Entity
-@Table(name = "players",
-       uniqueConstraints = @UniqueConstraint(name = "uk_player_jersey_sport", columnNames = {"jersey_number", "sport_id"}))
+@Table(name = "players")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -66,6 +65,21 @@ public class Player extends BaseEntity {
     @OneToMany(mappedBy = "player", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @Builder.Default
     private List<PlayerEvaluation> evaluations = new ArrayList<>();
+
+    @Transient
+    private Attendance.AttendanceStatus attendanceStatus;
+
+    @Transient
+    private long presentCount;
+
+    @Transient
+    private long absentCount;
+
+    @Transient
+    private long lateCount;
+
+    @Transient
+    private long excusedCount;
 
     @com.fasterxml.jackson.annotation.JsonProperty("sportId")
     public Long getSportId() {
