@@ -72,6 +72,19 @@ public class UserService {
     }
 
     @Transactional
+    public void changePassword(Long userId, String currentRawPassword, String newRawPassword) {
+        User user = findById(userId);
+        if (currentRawPassword == null || !passwordEncoder.matches(currentRawPassword, user.getPasswordHash())) {
+            throw new IllegalArgumentException("Current password is incorrect.");
+        }
+        if (newRawPassword == null || newRawPassword.isEmpty()) {
+            throw new IllegalArgumentException("New password is required.");
+        }
+        user.setPasswordHash(passwordEncoder.encode(newRawPassword));
+        userRepository.save(user);
+    }
+
+    @Transactional
     public void setEnabled(Long userId, boolean enabled) {
         User user = findById(userId);
         user.setEnabled(enabled);

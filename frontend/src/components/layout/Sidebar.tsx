@@ -7,6 +7,7 @@ import {
   ClipboardList,
   Settings,
   LogOut,
+  UserRound,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 
@@ -21,6 +22,7 @@ const navItems: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: <LayoutDashboard className="h-4 w-4" /> },
   { label: 'Roster', href: '/roster', icon: <Users className="h-4 w-4" /> },
   { label: 'Attendance', href: '/attendance', icon: <ClipboardList className="h-4 w-4" /> },
+  { label: 'My Profile', href: '/profile', icon: <UserRound className="h-4 w-4" /> },
   { label: 'Admin', href: '/admin', icon: <Settings className="h-4 w-4" />, requiredRole: ROLES.ADMIN },
 ]
 

@@ -1,6 +1,7 @@
 export { default as LoginPage } from './LoginPage'
 export { default as DashboardPage } from './DashboardPage'
 export { default as RosterPage } from './RosterPage'
+export { default as ProfilePage } from './ProfilePage'
 export { default as AttendancePage } from './AttendancePage'
 export { default as AdminPage } from './AdminPage'
 export { default as NotFoundPage } from './NotFoundPage'

@@ -5,11 +5,10 @@ import com.sportscamp.attendance.entity.User;
 import com.sportscamp.attendance.service.SportService;
 import com.sportscamp.attendance.service.UserService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
 import java.util.List;
@@ -52,6 +51,47 @@ public class AuthApiController {
             }
         }
 
+        return ResponseEntity.ok(result);
+    }
+
+    @PatchMapping("/me")
+    public ResponseEntity<?> updateProfile(@RequestBody Map<String, String> body, Authentication auth) {
+        if (auth == null || !auth.isAuthenticated()) {
+            return ResponseEntity.status(401).build();
+        }
+        User user = userService.findByUsername(auth.getName());
+
+        // Update profile fields if provided
+        boolean hasProfileUpdate = body.containsKey("fullName") || body.containsKey("email") || body.containsKey("phone");
+        if (hasProfileUpdate) {
+            user = userService.updateUser(
+                    user.getId(),
+                    body.get("fullName"),
+                    body.get("email"),
+                    body.get("phone")
+            );
+        }
+
+        // Change password if both current and new password are provided
+        String currentPassword = body.get("currentPassword");
+        String newPassword = body.get("newPassword");
+        if (newPassword != null && !newPassword.isEmpty()) {
+            try {
+                userService.changePassword(user.getId(), currentPassword, newPassword);
+            } catch (IllegalArgumentException e) {
+                return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+            }
+        }
+
+        // Return the updated user profile
+        Map<String, Object> result = new HashMap<>();
+        result.put("id", user.getId());
+        result.put("username", user.getUsername());
+        result.put("fullName", user.getFullName());
+        result.put("email", user.getEmail());
+        result.put("phone", user.getPhone());
+        result.put("role", user.getRole().name());
+        result.put("enabled", user.isEnabled());
         return ResponseEntity.ok(result);
     }
 }

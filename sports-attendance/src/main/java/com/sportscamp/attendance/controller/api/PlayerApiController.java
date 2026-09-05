@@ -124,30 +124,32 @@ public class PlayerApiController {
 
     /**
      * POST /api/sports/{sportId}/players/{playerId}/promote-captain
-     * Promotes the given player to captain: creates a User account (ROLE_CAPTAIN) if needed
-     * and adds them to the sport's captains list.
+     * Promotes the given player to captain: creates a User account (ROLE_CAPTAIN) using the
+     * admin-provided password and adds them to the sport's captains list.
+     * body: {"password":"adminchosenpass"}
      */
     @PostMapping("/sports/{sportId}/players/{playerId}/promote-captain")
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<?> promoteToCaptain(
             @PathVariable Long sportId,
             @PathVariable Long playerId,
+            @RequestBody(required = false) Map<String, Object> body,
             Authentication auth) {
         User me = userService.findByUsername(auth.getName());
         Player player = playerService.findById(playerId);
         if (!isCaptainOfPlayer(me, player)) {
             throw new AccessDeniedException("You are not authorized to manage this player.");
         }
-        User captain = playerService.promoteToCaptain(playerId, userService, sportService);
-        String tempPassword = playerService.getLastCreatedPassword();
+        String password = body == null ? null : (body.get("password") != null ? body.get("password").toString() : null);
+        User captain;
+        try {
+            captain = playerService.promoteToCaptain(playerId, password, userService, sportService);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage()));
+        }
         Map<String, Object> result = new java.util.HashMap<>();
         result.put("captain", captain);
-        if (tempPassword != null) {
-            result.put("temporaryPassword", tempPassword);
-            result.put("passwordNote", "A new captain account was created. Share this temporary password with the captain.");
-        } else {
-            result.put("passwordNote", "This player already had a captain account — no new password generated.");
-        }
+        result.put("passwordNote", "Captain account is ready to use with the password you set.");
         return ResponseEntity.ok(result);
     }
 

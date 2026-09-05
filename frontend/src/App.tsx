@@ -8,6 +8,7 @@ import { RoleGuard } from '@/components/shared/RoleGuard'
 
 const DashboardPage = lazy(() => import('@/pages/DashboardPage'))
 const RosterPage = lazy(() => import('@/pages/RosterPage'))
+const ProfilePage = lazy(() => import('@/pages/ProfilePage'))
 const AttendancePage = lazy(() => import('@/pages/AttendancePage'))
 const AdminPage = lazy(() => import('@/pages/AdminPage'))
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'))
@@ -90,6 +91,7 @@ export default function App() {
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="roster" element={<RosterPage />} />
+          <Route path="profile" element={<ProfilePage />} />
           <Route path="attendance" element={<AttendancePage />} />
           <Route
             path="admin"

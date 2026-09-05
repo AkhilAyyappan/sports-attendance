@@ -56,6 +56,17 @@ export default function AdminPage() {
   const [promotePlayerDialog, setPromotePlayerDialog] = useState<{ open: boolean }>({ open: false })
   const [promotePlayerSelectedSport, setPromotePlayerSelectedSport] = useState<number | null>(null)
   const [promotePlayerSearch, setPromotePlayerSearch] = useState('')
+  const [promoteConfirm, setPromoteConfirm] = useState<{
+    open: boolean
+    sportId: number | null
+    player: Player | null
+    password: string
+  }>({
+    open: false,
+    sportId: null,
+    player: null,
+    password: '',
+  })
   const [createSportOpen, setCreateSportOpen] = useState(false)
   const [resetPassDialog, setResetPassDialog] = useState<{ open: boolean; captain: Captain | null; newPass: string }>({
     open: false,
@@ -163,7 +174,6 @@ export default function AdminPage() {
 
   // Expanded player sections per sport
   const [expandedSports, setExpandedSports] = useState<Set<number>>(new Set())
-  const [promoteResult, setPromoteResult] = useState<{ playerId: number; result: any } | null>(null)
 
   // Handlers
   const handleCreateCaptain = async (e: React.FormEvent) => {
@@ -346,35 +356,28 @@ export default function AdminPage() {
     })
   }
 
-  // Promote a player to captain
-  const handlePromotePlayer = async (sportId: number, player: Player) => {
-    try {
-      const result = await promoteToCaptain.mutateAsync({ sportId, playerId: player.id })
-      setPromoteResult({ playerId: player.id, result })
-      if (result.temporaryPassword) {
-        toast.success(`"${player.fullName}" promoted to captain. Temporary password: ${result.temporaryPassword}`)
-      } else {
-        toast.success(`"${player.fullName}" is now a captain.`)
-      }
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to promote player.')
-    }
+  // Open the password-confirmation dialog to promote a player to captain
+  const openPromoteConfirm = (sportId: number, player: Player) => {
+    setPromoteConfirm({ open: true, sportId, player, password: '' })
   }
 
-  // Promote a selected player to captain (from "New Captain" dialog)
-  const handlePromotePlayerFromDialog = async (player: Player) => {
-    if (!player.sportId) {
-      toast.error('Player has no sport assigned.')
+  // Confirm the promotion with the admin-typed password
+  const handleConfirmPromote = async () => {
+    if (!promoteConfirm.player || !promoteConfirm.sportId) return
+    if (!promoteConfirm.password.trim()) {
+      toast.error('Enter a password for the new captain account.')
       return
     }
+    const player = promoteConfirm.player
+    const sportId = promoteConfirm.sportId
     try {
-      const result = await promoteToCaptain.mutateAsync({ sportId: player.sportId, playerId: player.id })
-      setPromotePlayerDialog({ open: false })
-      if (result.temporaryPassword) {
-        toast.success(`"${player.fullName}" promoted to captain. Temporary password: ${result.temporaryPassword}`)
-      } else {
-        toast.success(`"${player.fullName}" is now a captain.`)
-      }
+      await promoteToCaptain.mutateAsync({
+        sportId,
+        playerId: player.id,
+        password: promoteConfirm.password.trim(),
+      })
+      toast.success(`"${player.fullName}" promoted to captain with the password you set.`)
+      setPromoteConfirm({ open: false, sportId: null, player: null, password: '' })
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to promote player.')
     }
@@ -752,12 +755,11 @@ export default function AdminPage() {
                                   sportId={sport.id}
                                   sportName={sport.name}
                                   sportCaptains={sportCaptains}
-                                  onPromote={handlePromotePlayer}
+                                  onPromote={openPromoteConfirm}
                                   onDemote={handleDemotePlayer}
                                   onEditPlayer={openEditPlayer}
                                   promotePending={promoteToCaptain.isPending}
                                   demotePending={demoteCaptain.isPending}
-                                  promoteResult={promoteResult}
                                 />
                               </TableCell>
                             </TableRow>
@@ -1360,7 +1362,7 @@ export default function AdminPage() {
                         <Button
                           size="sm"
                           disabled={!canPromote || promoteToCaptain.isPending}
-                          onClick={() => handlePromotePlayerFromDialog(player)}
+                          onClick={() => openPromoteConfirm(promotePlayerSelectedSport, player)}
                           className="h-7 px-2 text-xs font-sans shrink-0"
                         >
                           {alreadyCaptain ? '—' : promoteToCaptain.isPending ? '…' : 'Promote'}
@@ -1385,6 +1387,54 @@ export default function AdminPage() {
         </DialogContent>
       </Dialog>
 
+      {/* PROMOTE CONFIRM DIALOG — admin types the new captain's password */}
+      <Dialog open={promoteConfirm.open} onOpenChange={(open) => {
+        if (!open) setPromoteConfirm({ open: false, sportId: null, player: null, password: '' })
+      }}>
+        <DialogContent className="max-w-sm w-[calc(100vw-1rem)]">
+          <DialogHeader>
+            <DialogTitle className="font-serif flex items-center gap-2">
+              <Crown className="h-5 w-5 text-accent" />
+              Promote to Captain
+            </DialogTitle>
+            <DialogDescription>
+              Create a captain account for <strong>{promoteConfirm.player?.fullName}</strong> and type the password they will use to sign in.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5 my-4">
+            <Label htmlFor="promotePassword" className="text-xs font-sans text-slate-700">New Captain Password *</Label>
+            <Input
+              id="promotePassword"
+              type="password"
+              placeholder="e.g. Coach@1234"
+              value={promoteConfirm.password}
+              onChange={(e) => setPromoteConfirm((prev) => ({ ...prev, password: e.target.value }))}
+              autoFocus
+            />
+            <p className="text-xs text-slate-400 font-sans">
+              Use a password the new captain can remember — not an auto-generated one.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setPromoteConfirm({ open: false, sportId: null, player: null, password: '' })}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleConfirmPromote}
+              disabled={promoteToCaptain.isPending}
+              className="bg-accent hover:bg-accent-light text-white font-sans text-xs"
+            >
+              {promoteToCaptain.isPending ? 'Promoting…' : 'Promote'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   )
 }
@@ -1398,7 +1448,6 @@ interface SportPlayersSectionProps {
   onEditPlayer: (player: Player, sportId: number) => void
   promotePending: boolean
   demotePending: boolean
-  promoteResult: { playerId: number; result: any } | null
 }
 
 function SportPlayersSection({
@@ -1410,7 +1459,6 @@ function SportPlayersSection({
   onEditPlayer,
   promotePending,
   demotePending,
-  promoteResult,
 }: SportPlayersSectionProps) {
   const { data: players = [], isLoading: playersLoading } = usePlayers(sportId)
   const captainIds = new Set(sportCaptains.map((c) => c.id))
@@ -1491,15 +1539,6 @@ function SportPlayersSection({
               </div>
             )
           })}
-        </div>
-      )}
-      {promoteResult && promoteResult.playerId && (
-        <div className="mt-3 p-3 rounded bg-amber-50 border border-amber-200">
-          <p className="text-xs font-medium text-amber-800">Temporary Password</p>
-          <p className="text-sm font-mono text-amber-900 mt-0.5">
-            {promoteResult.result.temporaryPassword}
-          </p>
-          <p className="text-xs text-amber-700 mt-1">{promoteResult.result.passwordNote}</p>
         </div>
       )}
     </div>

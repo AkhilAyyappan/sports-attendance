@@ -41,3 +41,8 @@ export {
   usePlayerAttendance,
   usePlayerAttendanceSummary,
 } from './useAttendance'
+export {
+  useMe,
+  useUpdateMyProfile,
+  useChangeMyPassword,
+} from './useProfile'

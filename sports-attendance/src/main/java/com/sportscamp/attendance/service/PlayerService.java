@@ -10,7 +10,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -75,13 +74,13 @@ public class PlayerService {
     }
 
     /**
-     * Promotes a player to captain: creates a User account (ROLE_CAPTAIN) and assigns them
-     * to the sport's captains list.
-     * Returns the created/found captain user.  Call {@link #getLastCreatedPassword()}
-     * immediately after to retrieve the temporary password (only valid for newly created accounts).
+     * Promotes a player to captain: creates a User account (ROLE_CAPTAIN) using the
+     * admin-provided password and assigns them to the sport's captains list.
+     * If the player already has a captain account (matched by email), it is reused
+     * and the provided password is ignored.
      */
     @Transactional
-    public User promoteToCaptain(Long playerId, UserService userService, SportService sportService) {
+    public User promoteToCaptain(Long playerId, String rawPassword, UserService userService, SportService sportService) {
         Player player = findById(playerId);
         Sport sport = player.getSport();
         if (sport == null) {
@@ -102,24 +101,20 @@ public class PlayerService {
                 throw new IllegalStateException(
                         "User with email " + username + " exists but is not a captain.");
             }
-            lastCreatedPassword = null; // reusing existing account
+            // Reusing existing account — password is left unchanged.
         } else {
-            String tempPassword = UUID.randomUUID().toString().substring(0, 8);
+            if (rawPassword == null || rawPassword.isBlank()) {
+                throw new IllegalArgumentException("A password is required to create the new captain account.");
+            }
             captain = userService.createUser(
-                    username, tempPassword,
+                    username, rawPassword,
                     player.getFullName(), player.getEmail(), player.getPhone(),
                     User.Role.ROLE_CAPTAIN
             );
-            lastCreatedPassword = tempPassword;
         }
 
         sportService.assignCaptain(sport.getId(), captain);
         return captain;
-    }
-
-    /** Returns the temporary password set by the last {@link #promoteToCaptain} call. */
-    public String getLastCreatedPassword() {
-        return lastCreatedPassword;
     }
 
     /**
@@ -135,6 +130,4 @@ public class PlayerService {
         }
         sportService.removeCaptain(sport.getId(), player.getSportId());
     }
-
-    private String lastCreatedPassword;
 }

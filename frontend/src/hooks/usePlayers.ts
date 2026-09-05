@@ -56,18 +56,20 @@ export function useDeletePlayer() {
 
 export interface CaptainResult {
   captain: { id: number; username: string; fullName: string; email?: string }
-  temporaryPassword?: string
   passwordNote?: string
 }
 
 export function usePromotePlayerToCaptain() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ sportId, playerId }: { sportId: number; playerId: number }) =>
-      api.post(`/api/sports/${sportId}/players/${playerId}/promote-captain`).then((r) => r.data as CaptainResult),
+    mutationFn: ({ sportId, playerId, password }: { sportId: number; playerId: number; password: string }) =>
+      api
+        .post(`/api/sports/${sportId}/players/${playerId}/promote-captain`, { password })
+        .then((r) => r.data as CaptainResult),
     onSuccess: (_data, variables) => {
       qc.invalidateQueries({ queryKey: ['sports', variables.sportId, 'players'] })
       qc.invalidateQueries({ queryKey: ['sports'] })
+      qc.invalidateQueries({ queryKey: ['captains'] })
     },
   })
 }
