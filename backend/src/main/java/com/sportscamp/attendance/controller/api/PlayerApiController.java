@@ -125,8 +125,8 @@ public class PlayerApiController {
     /**
      * POST /api/sports/{sportId}/players/{playerId}/promote-captain
      * Promotes the given player to captain: creates a User account (ROLE_CAPTAIN) using the
-     * admin-provided password and adds them to the sport's captains list.
-     * body: {"password":"adminchosenpass"}
+     * admin-provided username and password and adds them to the sport's captains list.
+     * body: {"username":"new_captain","password":"adminchosenpass"}
      */
     @PostMapping("/sports/{sportId}/players/{playerId}/promote-captain")
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
@@ -140,16 +140,17 @@ public class PlayerApiController {
         if (!isCaptainOfPlayer(me, player)) {
             throw new AccessDeniedException("You are not authorized to manage this player.");
         }
+        String username = body == null ? null : (body.get("username") != null ? body.get("username").toString() : null);
         String password = body == null ? null : (body.get("password") != null ? body.get("password").toString() : null);
         User captain;
         try {
-            captain = playerService.promoteToCaptain(playerId, password, userService, sportService);
-        } catch (IllegalArgumentException e) {
+            captain = playerService.promoteToCaptain(playerId, username, password, userService, sportService);
+        } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage()));
         }
         Map<String, Object> result = new java.util.HashMap<>();
         result.put("captain", captain);
-        result.put("passwordNote", "Captain account is ready to use with the password you set.");
+        result.put("passwordNote", "Captain account is ready to use with the username and password you set.");
         return ResponseEntity.ok(result);
     }
 
@@ -168,7 +169,7 @@ public class PlayerApiController {
         if (!isCaptainOfPlayer(me, player)) {
             throw new AccessDeniedException("You are not authorized to manage this player.");
         }
-        playerService.demoteFromCaptain(playerId, sportService);
+        playerService.demoteFromCaptain(playerId, sportService, userService);
         return ResponseEntity.noContent().build();
     }
 }

@@ -1,0 +1,489 @@
+# Technical Design Document: Sports Camp Attendance System
+
+**Project:** University Athletics — Sports Camp Attendance System (`sports-attendance`)
+**Document type:** Technical Design Document (Data Architecture · Request Flows · RBAC · Content Visibility)
+**Date:** 2026-09-11
+
+---
+
+## 1. System Overview & Scope
+
+### 1.1 High-Level Architecture
+
+The system is a **sport-centric attendance management platform** for a university athletics department. It replaces a legacy `Camp → Team → Sport` hierarchy with a flat **`Sport`-program model**, where each sport program owns its roster of athletes, training sessions, attendance registers, and performance evaluations.
+
+Logical topology:
+
+```
+┌──────────────────────────────┐         ┌──────────────────────────────┐
+│  React 19 SPA (Vite/TS)      │   CORS  │  Spring Boot 3.2 API          │
+│  Browser  :5173              │ ──────► │  Tomcat :8080                 │
+│  Axios + Basic Auth          │ rest/√  │  Security / Controllers /    │
+│  TanStack Query cache        │ JSON    │  Services / Repositories     │
+│  sessionStorage token store  │         └──────────────┬───────────────┘
+└──────────────────────────────┘                        │ JPA / JDBC
+                                                        ▼
+                                        ┌──────────────────────────────┐
+                                        │  PostgreSQL on Supabase       │
+                                        │  (PgBouncer pooler :6543)     │
+                                        │  Flyway migrations            │
+                                        └──────────────────────────────┘
+```
+
+Three consumers share one Spring Security session story:
+1. **React SPA** (`frontend/`) — the primary UI. Authenticates via **HTTP Basic**, caches the encoded `Basic <b64(user:pass)>` token in `sessionStorage`, and calls `/api/**`.
+2. **Thymeleaf pages** (`/login`, `/dashboard`, `/admin/**`, `/captain/**`) — legacy server-rendered fallback with form login + session cookie (`JSESSIONID`); the SPA has superseded these but the MVC controllers (`AuthController`) remain and route role-based page redirects.
+3. **Direct REST clients** (`requests.http`, scripts) — Basic auth against `/api/**`.
+
+### 1.2 Core Technical Stack
+
+| Layer | Technology | Version / Notes |
+| :--- | :--- | :--- |
+| **Frontend** | React + TypeScript | React 19.2, Vite 8, `@vitejs/plugin-react` |
+| | Data fetching | TanStack Query 5 (`@tanstack/react-query`) + Axios 1.11 |
+| | Routing | React Router 7 |
+| | Forms / Validation | React Hook Form + Zod 4 + `@hookform/resolvers` |
+| | UI | Tailwind CSS 4, shadcn/ui primitives (Radix), lucide-react icons, sonner toasts |
+| **Backend** | Java 17 + Spring Boot 3.2.4 | `spring-boot-starter-web`, `-data-jpa`, `-security`, `-validation`, `-thymeleaf` |
+| | Build | Maven (`pom.xml`), artifact `sports-attendance-1.0.0-SNAPSHOT` |
+| | Persistence | Spring Data JPA (Hibernate, `ddl-auto: validate`) |
+| | Migrations | Flyway (`classpath:db/migration`) |
+| | Object mapping | Lombok (`@Getter/@Setter/@Builder`), Jackson |
+| **Database** | PostgreSQL | Supabase-hosted; PgBouncer **transaction pooler** (`:6543`) for the app, **direct** connection (`:5432`) for Flyway DDL |
+| **Authn / Authz** | Spring Security | HTTP Basic + Form login + `DaoAuthenticationProvider` + `BCryptPasswordEncoder`; method-level `@PreAuthorize` |
+| **Ops** | Actuator | Exposes `/actuator/health`, `/actuator/info` only |
+
+> **Note on documentation drift:** `backend/README.md` still describes the pre-migration `Camp/Team` model and a `requests.http` file that no longer exists. The authoritative schema is the **Flyway migration chain (V1→V4) + JPA entities**, documented below.
+
+---
+
+## 2. Database Architecture & Schema
+
+### 2.1 Entity–Relationship Overview
+
+```
+┌──────────┐  N           N  ┌──────────┐
+│  users   │◄──sport_captains──►│  sports  │
+│ (admin/  │  (join)  1   1    │          │
+│  captain)│                  └────┬─────┘
+└────┬─────┘                       │ 1
+     │ 1                    ┌──────┴──────┐
+     │ (marked_by /         │             │
+     │  evaluated_by)       ▼             ▼
+     │             ┌────────────┐   ┌──────────────┐
+     │             │  players   │   │ training_    │
+     │             │  (roster)  │   │ sessions     │
+     │             └─────┬──────┘   └──────┬───────┘
+     │                   │ 1               │ 1
+     │                   ▼                 ▼
+     └────────────────►┌───────────────────────┐
+                       │  attendances          │  (player_id ✕ session_id UNIQUE)
+                       └──────────┬────────────┘
+                                  │
+                        ┌─────────▼─────────┐
+                        │ player_evaluations│  (player_id ✕ session_id UNIQUE)
+                        └───────────────────┘
+```
+
+| Relationship | Cardinality | Mapping | Cascade |
+| :--- | :--- | :--- | :--- |
+| `users` ⟷ `sports` (captainship) | M : N | `sport_captains` join table (`Sport.captains`) | Both FKs `ON DELETE CASCADE` |
+| `sports` → `players` | 1 : N | `players.sport_id` | `ON DELETE CASCADE` |
+| `sports` → `training_sessions` | 1 : N | `training_sessions.sport_id` | `ON DELETE CASCADE` |
+| `players` → `attendances` | 1 : N | `attendances.player_id` | `ON DELETE CASCADE` |
+| `training_sessions` → `attendances` | 1 : N | `attendances.session_id` | `ON DELETE CASCADE` |
+| `players` → `player_evaluations` | 1 : N | `player_evaluations.player_id` | `ON DELETE CASCADE` |
+| `training_sessions` → `player_evaluations` | 1 : N | `player_evaluations.session_id` | `ON DELETE CASCADE` |
+| `users` → `attendances` (who marked) | 1 : N | `attendances.marked_by` | `ON DELETE SET NULL` |
+| `users` → `player_evaluations` (evaluator) | 1 : N | `player_evaluations.evaluated_by` | `ON DELETE SET NULL` |
+
+### 2.2 Database Schemas
+
+All tables inherit the audit pair `created_at TIMESTAMP NOT NULL DEFAULT NOW()` and `updated_at TIMESTAMP NOT NULL DEFAULT NOW()`, maintained by JPA auditing (`BaseEntity` with `@CreatedDate`/`@LastModifiedDate`, enabled via `@EnableJpaAuditing`).
+
+#### `users`
+
+| Field | Type | Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | BIGINT | PK — `user_id_seq` | Surrogate key |
+| `username` | VARCHAR(100) | NOT NULL, **UNIQUE** | Login identifier |
+| `password_hash` | VARCHAR(255) | NOT NULL | **BCrypt** hash; never serialized (`@JsonIgnore`) |
+| `full_name` | VARCHAR(100) | NOT NULL | Display name |
+| `phone` | VARCHAR(20) | NULL | Contact |
+| `email` | VARCHAR(100) | NULL | Contact; used to "re-link" auto-created captain accounts |
+| `role` | VARCHAR(20) | NOT NULL, `ROLE_ADMIN \| ROLE_CAPTAIN` | System role (mapped `ENUM STRING`) |
+| `enabled` | BOOLEAN | NOT NULL, DEFAULT TRUE | Login gate; disabled users fail authentication (`CustomUserDetailsService.disabled`) |
+| `created_at` / `updated_at` | TIMESTAMP | NOT NULL | Audit timestamps |
+
+#### `sports`
+
+| Field | Type | Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | BIGINT | PK — `sport_id_seq` | Surrogate key |
+| `name` | VARCHAR(100) | NOT NULL, **UNIQUE** (`uk_sport_name`) | Discipline name (case-insensitive dedupe in service) |
+| `description` | VARCHAR(500) | NULL | Long description |
+| `active` | BOOLEAN | NOT NULL, DEFAULT TRUE | **Soft-delete flag**; inactive sports hidden from `/api/sports/active` |
+| `created_at` / `updated_at` | TIMESTAMP | NOT NULL | Audit timestamps |
+
+#### `sport_captains` (join table)
+
+| Field | Type | Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `sport_id` | BIGINT | FK → `sports.id`, `ON DELETE CASCADE`; part of composite PK | Owning sport |
+| `captain_id` | BIGINT | FK → `users.id`, `ON DELETE CASCADE`; part of composite PK | Assigned captain/coach |
+
+Business rule enforced at the application layer: **max 3 captains per sport** (`MAX_CAPTAINS_PER_SPORT = 3` in `SportService`).
+
+#### `players`
+
+| Field | Type | Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | BIGINT | PK — `player_id_seq` | Surrogate key |
+| `full_name` | VARCHAR(150) | NOT NULL | Athlete name |
+| `date_of_birth` | DATE | NULL | DOB (PII — visibility governed, §5) |
+| `jersey_number` | INT | NULL | Unique **per sport** |
+| `position` | VARCHAR(200) | NULL | e.g. Striker, Bowler, Player-Coach |
+| `phone` | VARCHAR(20) | NULL | Contact (PII) |
+| `email` | VARCHAR(100) | NULL | Contact; key link for captain promotion |
+| `notes` | VARCHAR(500) | NULL | Free text / medical notes (PII) |
+| `active` | BOOLEAN | NOT NULL, DEFAULT TRUE | Soft-deactivation flag (`PlayerService.deactivate`) |
+| `sport_id` | BIGINT | NOT NULL, FK → `sports.id`, `ON DELETE CASCADE` | Owning program |
+| `created_at` / `updated_at` | TIMESTAMP | NOT NULL | Audit timestamps |
+| — | — | **UNIQUE** `uk_player_jersey_sport` (`jersey_number`, `sport_id`) | Prevents duplicate jersey numbers within a sport |
+
+#### `training_sessions`
+
+| Field | Type | Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | BIGINT | PK — `session_id_seq` | Surrogate key |
+| `title` | VARCHAR(200) | NOT NULL | e.g. `"2026-09-11 - Morning"` (generated from date+slot) |
+| `session_date` | DATE | NOT NULL | Training day |
+| `start_time` | TIME | NULL | Slot start (Morning `07:00` / Evening `16:30`) |
+| `end_time` | TIME | NULL | Slot end (Morning `09:00` / Evening `18:30`) |
+| `notes` | VARCHAR(500) | NULL | Coach notes |
+| `status` | VARCHAR(20) | NOT NULL, DEFAULT `SCHEDULED` | `SCHEDULED \| IN_PROGRESS \| COMPLETED \| CANCELLED` |
+| `sport_id` | BIGINT | NOT NULL, FK → `sports.id`, `ON DELETE CASCADE` | Owning program |
+| `created_at` / `updated_at` | TIMESTAMP | NOT NULL | Audit timestamps |
+
+#### `attendances`
+
+| Field | Type | Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | BIGINT | PK — `attendance_id_seq` | Surrogate key |
+| `player_id` | BIGINT | NOT NULL, FK → `players.id`, `ON DELETE CASCADE` | Athlete |
+| `session_id` | BIGINT | NOT NULL, FK → `training_sessions.id`, `ON DELETE CASCADE` | Session |
+| `status` | VARCHAR(20) | NOT NULL, DEFAULT `ABSENT` | `PRESENT \| ABSENT \| LATE \| EXCUSED` |
+| `marked_by` | BIGINT | NULL, FK → `users.id`, `ON DELETE SET NULL` | **Audit** — who recorded it (immortalizes the captain at time of marking) |
+| `marked_at` | TIMESTAMP | NULL | **Audit** — when recorded |
+| `remarks` | VARCHAR(500) | NULL | Note, e.g. "Arrived 10 min late" |
+| `created_at` / `updated_at` | TIMESTAMP | NOT NULL | Audit timestamps |
+| — | — | **UNIQUE** `uk_attendance_player_session` (`player_id`, `session_id`) | One attendance row per player per session → **natural key; bulk save is an upsert** |
+
+#### `player_evaluations`
+
+| Field | Type | Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | BIGINT | PK — `eval_id_seq` | Surrogate key |
+| `player_id` | BIGINT | NOT NULL, FK → `players.id`, `ON DELETE CASCADE` | Athlete |
+| `session_id` | BIGINT | NOT NULL, FK → `training_sessions.id`, `ON DELETE CASCADE` | Session |
+| `technical_score` | INT | NULL, `CHECK 1–10` | Skill rating |
+| `physical_score` | INT | NULL, `CHECK 1–10` | Fitness rating |
+| `attitude_score` | INT | NULL, `CHECK 1–10` | Team-play rating |
+| `comments` | VARCHAR(1000) | NULL | Free-text evaluation |
+| `evaluation_date` | DATE | NULL | When evaluated |
+| `evaluated_by` | BIGINT | NULL, FK → `users.id`, `ON DELETE SET NULL` | **Audit** — who evaluated |
+| `created_at` / `updated_at` | TIMESTAMP | NOT NULL | Audit timestamps |
+| — | — | **UNIQUE** `uk_eval_player_session` (`player_id`, `session_id`) | One evaluation per player per session |
+
+> **Domain status note:** `player_evaluations` is **fully modeled** (entity + repository + Flyway migration) but **exposed by no REST controller**. It is persisted-capable and available for `PlayerEvaluationRepository` (`findByPlayerId`, `findByPlayerIdAndSessionId`) but has zero API surface or UI today. Treat it as a reserved capability.
+
+### 2.3 Data Lifecycle
+
+**Soft deletes (preferred stop-state):**
+- `sports.active` — deactivation removes a sport from `findAllActive()`, `/api/sports/my`, and the captain's scoping queries, while preserving its rows.
+- `players.active` — `PlayerService.deactivate()` flips the flag; roster/attendance UI renders `ACTIVE`/`INACTIVE` badges. **However**, no code path currently invokes `deactivate()`; the UI uses hard delete instead.
+- `users.enabled` — account disable. `CustomUserDetailsService` maps `disabled(!user.isEnabled())`, so a disabled user is rejected at authentication time. Used by the Admin "Disable/Enable" toggle.
+
+**Hard deletes (`DELETE` endpoints):**
+- `DELETE /api/sports/{id}` — cascades to `players`, `training_sessions`, `attendances`, `player_evaluations`, and join rows in `sport_captains`. The UI confirms this ("its roster … attendance history").
+- `DELETE /api/players/{id}` — cascades `attendances` + `evaluations`. The UI confirms this.
+- `DELETE /api/sessions/{id}` — cascades its `attendances`.
+- `DELETE /api/users/{id}` — removes the account; upstream FK references are `SET NULL` (historical `marked_by`/`evaluated_by` preserved) and captainship join rows cascade away.
+
+**Auditing:**
+- Row-level `created_at`/`updated_at` on every table (JPA `@AuditingEntityListener`).
+- **Actor audit:** `attendances.marked_by`/`marked_at` snapshot the recording user at write time — history survives later captain reassignment or deletion; `player_evaluations.evaluated_by` does the same.
+- **No read/access audit log** exists; monitoring is limited to API-level observations.
+
+**Archiving:** No explicit archival job exists. Guardrails today are referential-integrity cascades plus soft `active` flags. Extrapolated standard pattern for growth: a scheduled job (e.g. Spring `@Scheduled`) that moves `attendances` older than a configurable horizon into a read-only `attendances_archive` partition, preserving the `(player_id, session_id)` natural key.
+
+---
+
+## 3. End-to-End Request Data Flow
+
+### 3.1 Request Cycle Steps (Generic)
+
+```
+ [1] Client (React SPA / curl)
+        │  HTTP request + Authorization: Basic base64(user:pass)
+        ▼
+ [2] Spring Security Filter Chain
+        • CorsFilter  — allows origins :5173/:5174, methods GET/POST/PUT/PATCH/DELETE/OPTIONS, credentials, MAX-AGE 3600
+        • SecurityContextPersistenceFilter — binds session
+        • BasicAuthenticationFilter — decodes Basic header →
+            DaoAuthenticationProvider → CustomUserDetailsService.loadUserByUsername()
+              → UserDetails{authorities=[ROLE_ADMIN | ROLE_CAPTAIN], disabled=!enabled}
+              → BCrypt compare (password_hash)
+        • If 401 (bad creds / disabled user) → WWW-Authenticate: Basic challenge, no controller invoked
+        ▼
+ [3] AuthorizeHttpRequests (URL-level gate)
+        • /api/**            → authenticated()
+        • /admin/**          → hasAuthority('ROLE_ADMIN')
+        • /captain/**        → hasAuthority('ROLE_CAPTAIN')
+        • /login, /actuator/*→ permitAll()
+        • CSRF ignored for /api/**; form login CSRF active for MVC pages; max 1 session per user
+        ▼
+ [4] Method-level gate — @PreAuthorize on controller methods (e.g. hasAnyRole / hasAuthority)
+        ▼
+ [5] Controller — manual object-level scope check (captain belongs to the target sport?)
+        • isCaptainOfSport / isCaptainOfSession / isCaptainOfPlayer
+        • Returns 403 (ResponseEntity status) or throws AccessDeniedException otherwise
+        ▼
+ [6] Service — transactions (@Transactional), business rules, repository calls
+        ▼
+ [7] Repository → JPA/Hibernate → JDBC → PostgreSQL (Supabase pooler)
+        ▼
+ [8] Response object mock → Jackson serialization (computed getters expose playerId/sessionId/sportId/playerFullName)
+        ▼
+ [9] HTTP response → axios interceptor (401 ⇒ clear sessionStorage ⇒ redirect /login) → TanStack Query cache
+```
+
+### 3.2 Sequence Mappings for Key Operations
+
+#### A. Authentication / Login (SPA)
+
+| Step | Actor → Actor | Detail |
+| :--- | :--- | :--- |
+| 1 | `LoginPage` → `useAuth.login()` | Client builds `Basic base64(username:password)` locally **before any backend call** |
+| 2 | Client → `/api/auth/me` | `GET` with `Authorization: Basic …`; expects 200 |
+| 3 | Filter chain | BasicAuthenticationFilter authenticates via `CustomUserDetailsService`, granting `ROLE_ADMIN` or `ROLE_CAPTAIN` |
+| 4 | `AuthApiController.getCurrentUser()` | Resolves `user = userService.findByUsername(auth.getName())` |
+| 5 | Payload transform | Controllers emit `{id, username, fullName, email, phone, role, enabled}`; if captain, inject `sports[]` = `[{id,name}…]` (via `sportService.findByCaptainId`) plus convenience `sportId`/`sportName` of first sport |
+| 6 | Client | On success stores `{token, username, fullName, role, id, …}` in **`sessionStorage['auth']`**; sets React role state; redirects `/dashboard`. **Fallback path** (legacy server): probe `/api/sports`, then probe `/api/users/captains` (200 ⇒ admin) |
+| 7 | Failure handling | 401 ⇒ throw "Invalid username or password"; frontend shows inline error, no state persisted |
+
+#### B. Captain reads roster (scoped read)
+
+| Step | Detail |
+| :--- | :--- |
+| 1 | Client (RosterPage) calls `useMySports()` → `GET /api/sports/my` |
+| 2 | `SportApiController.listMySports` → resolves user; **admin ⇒ all active; captain ⇒ `sportService.findByCaptainId(id)`** (JPQL `JOIN FETCH captains WHERE c.id=:captainId`) |
+| 3 | RosterPage auto-selects first sport → `GET /api/sports/{sportId}/players` |
+| 4 | `PlayerApiController.listBySport` → `isCaptainOfSport(user, sportId)`; captain not assigned ⇒ **403**; admin ⇒ pass |
+| 5 | `PlayerService.findAllBySport` → `PlayerRepository.findBySportId` → only players of that sport returned |
+
+#### C. Bulk attendance submission (captain marks registers)
+
+| Step | Detail |
+| :--- | :--- |
+| 1 | Client (AttendancePage) sends `POST /api/sessions/{sessionId}/attendance` body `{"records":[{"playerId":1,"status":"PRESENT"}…]}` |
+| 2 | `@PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_CAPTAIN')")` — role gate |
+| 3 | `AttendanceApiController.saveAttendance` → loads `me`, `session`; **`isCaptainOfSession`** check ⇒ unauthorized captains get `AccessDeniedException` (403) |
+| 4 | Controller coercion: `status` is `AttendanceStatus.valueOf(...)`; bad enum ⇒ 400 |
+| 5 | `AttendanceService.saveAttendance` (transactional) — **upsert keyed on `(player_id, session_id)`**: `findByPlayerIdAndSessionId(...).orElseGet(new Attendance)`; sets `status`, `markedBy=me`, `markedAt=now()`, saves |
+| 6 | Empty/absent `records` ⇒ no-op; response `204 No Content` |
+| 7 | Client cache invalidation: invalidates `['sessions', sessionId, 'attendance']` and all `['sessions'…]` keys → UI summary (`present/late/absent/total`) recomputes |
+
+#### D. Admin creates a captain account
+
+| Step | Detail |
+| :--- | :--- |
+| 1 | Client (AdminPage) → `POST /api/users` body `{username, password, fullName, email, phone, role:'ROLE_CAPTAIN'}` |
+| 2 | `UserApiController` is **class-level `@PreAuthorize("hasAuthority('ROLE_ADMIN')")`** — non-admin → 403 before method |
+| 3 | Controller validates username/password/fullName presence → `400 {message}` on miss |
+| 4 | `UserService.createUser` → **uniqueness guard** `existsByUsername` ⇒ `DuplicateResourceException` (409); bcrypt-encodes password; sets `enabled=true` |
+| 5 | Persist `User{role=ROLE_CAPTAIN}`; returns `201` + serialized user (password never serialized — `@JsonIgnore`) |
+| 6 | Client invalidates `['captains']` query; captain now assignable to a sport (§ E) |
+
+#### E. Admin promotes a player → captain (privileged lifecycle)
+
+| Step | Detail |
+| :--- | :--- |
+| 1 | Client discards typed `{username, password}` for the player |
+| 2 | `POST /api/sports/{sportId}/players/{playerId}/promote-captain`, `@PreAuthorize("hasAuthority('ROLE_ADMIN')")` |
+| 3 | `PlayerService.promoteToCaptain` — resolution ladder: **(1)** reuse existing `ROLE_CAPTAIN` user by typed username; **(2)** reuse captain account previously auto-created from the player's email; **(3)** else create a new `ROLE_CAPTAIN` user (fullName/email/phone seeded from the player row) |
+| 4 | `SportService.assignCaptain` — **enforces ≤3 captains**; exceeding ⇒ `IllegalStateException` (400) |
+| 5 | `Sport.captains.add(captain)` → join row in `sport_captains`; response `200 {captain, passwordNote}` |
+| 6 | Reverse op `demote` is intended to remove the join row only (the `users` account survives). **⚠ Verified defect:** `PlayerService.demoteFromCaptain` passes `player.getSportId()` in the `captainId` argument slot of `sportService.removeCaptain(...)` (`PlayerService.java:144`), so the captain is **not** actually removed from `sport_captains` and the operation no-ops. See §4.4 #6 |
+| 7 | Client invalidates `['sports', sportId, 'players']`, `['sports']`, `['captains']` |
+
+### 3.3 Payload Transformations (Jackson projections)
+
+| Entity | Exposed computed DTO fields | Hidden fields |
+| :--- | :--- | :--- |
+| `Player` | `sportId` (`@JsonProperty` from `sport.id`) | `attendances`, `evaluations` (`@JsonIgnore`), `sport` partially (`@JsonIgnoreProperties`) |
+| `TrainingSession` | `sportId` | `attendances` (`@JsonIgnore`) |
+| `Attendance` | `playerId`, `sessionId`, `playerFullName` (computed) | `player`, `session`, `markedBy` full graphs (`@JsonIgnoreProperties` → flattened to IDs) |
+| `Sport` | `captains[]` (with `@JsonIgnoreProperties`) | `players`, `trainingSessions` collections (`@JsonIgnore`) |
+| `User` | all fields | `passwordHash` (`@JsonIgnore`) |
+
+Result: the API is already a **read-model with field reduction** — nested graphs are flattened to scalar IDs in transit, keeping payloads small and avoiding lazy-loading serialization errors.
+
+### 3.4 Error-Handling Posture
+
+There is **no `@ControllerAdvice` / `@ExceptionHandler`** class. Failure mapping is:
+- `@ResponseStatus` on the two custom exceptions — `DuplicateResourceException` → **409**, `ResourceNotFoundException` → **404**.
+- **Inline** `ResponseEntity` status handling in each controller (400/401/403/404/409) with ad-hoc `{message}` bodies.
+- Auth failures are handled by the Spring Security filter chain (401 for Basic; `/login?error` redirect for form login); `AccessDeniedException` surfaces as 403.
+- Spring Boot's default `/error` handler is the only catch-all fallback (whitelabel disabled).
+
+Recommended production hardening: introduce a `@RestControllerAdvice` emitting a uniform error envelope `{status, title, detail, timestamp}` (the shape `backend/README.md` already documents), and add Bean Validation on request DTOs.
+
+---
+
+## 4. Authorization & RBAC Framework
+
+### 4.1 Role Definitions
+
+| Role (`users.role`) | Persona | System entitlement |
+| :--- | :--- | :--- |
+| `ROLE_ADMIN` | System Administrator(s) | **Global.** Every domain entity, every sport, every captain. Sole owner of identity administration (create/edit/disable/delete users, reset passwords, assign/remove captains, promote/demote player→captain, sport CRUD + lifecycle). Seed account `admin / admin123` (bcrypt) is bootstrapped by `V2__seed_data.sql`. |
+| `ROLE_CAPTAIN` | Captain / Coach | **Scoped.** Operates **only** on sports where they appear in `sport_captains` (≤3 per sport, `SportService`). Can read their assigned programs, their rosters, sessions, attendance; can register athletes, create/update/delete sessions, record attendance. Cannot access user administration, other sports, or global lists beyond their scope. |
+
+No third "player" identity exists in the system — athletes exist as `players` records without login credentials. A promoted athlete becomes a `ROLE_CAPTAIN` user while remaining a `players` row.
+
+### 4.2 Permissions Catalog (atomic)
+
+| Permission | Endpoint(s) | Enforcement |
+| :--- | :--- | :--- |
+| `sport:read` | `GET /api/sports`, `GET /api/sports/active`, `GET /api/sports/{id}`, `GET /api/sports/my` | Authenticated + object-level scoping (captain ⇒ own sports only) |
+| `sport:create` | `POST /api/sports` | `@PreAuthorize ROLE_ADMIN` |
+| `sport:update` | `PUT/PATCH /api/sports/{id}` | `@PreAuthorize ROLE_ADMIN` |
+| `sport:delete` | `DELETE /api/sports/{id}` | `@PreAuthorize ROLE_ADMIN` |
+| `sport:cptn:assign` | `POST /api/sports/{id}/captain` | `@PreAuthorize ROLE_ADMIN` |
+| `sport:cptn:remove` | `DELETE /api/sports/{id}/captain/{captainId}` | `@PreAuthorize ROLE_ADMIN` |
+| `player:read` | `GET /api/sports/{sportId}/players`, `GET /api/players/{id}` | Authenticated + captain-of-sport scope |
+| `player:read:all` | `GET /api/players` | Admin (all) / captain (own sports only) |
+| `player:create` | `POST /api/sports/{sportId}/players` | Admin or Captain + captain-of-sport |
+| `player:update` | `PUT /api/players/{id}` | Admin or Captain + captain-of-player |
+| `player:delete` | `DELETE /api/players/{id}` | Admin or Captain + captain-of-player |
+| `player:promote` | `POST …/promote-captain` | `@PreAuthorize ROLE_ADMIN` |
+| `player:demote` | `POST …/demote` | `@PreAuthorize ROLE_ADMIN` |
+| `session:read` | `GET /api/sessions`, `GET /api/sports/{sportId}/sessions`, `GET /api/sessions/{id}` | Authenticated + captain-of-sport/session scope |
+| `session:create` | `POST /api/sports/{sportId}/sessions` | Admin or Captain + captain-of-sport |
+| `session:update` | `PUT /api/sessions/{id}` | Admin or Captain + captain-of-session |
+| `session:status` | `PATCH /api/sessions/{id}/status` | Admin or Captain + captain-of-session |
+| `session:delete` | `DELETE /api/sessions/{id}` | Admin or Captain + captain-of-session |
+| `attendance:read` | `GET /api/sessions/{sessionId}/attendance`, `GET /api/players/{playerId}/attendance` | Authenticated + captain-of-session/player scope |
+| `attendance:record` | `POST /api/sessions/{sessionId}/attendance` | Admin or Captain + captain-of-session |
+| `attendance:update` | `PATCH /api/attendance/{id}` | Admin or Captain *(see hardening notes)* |
+| `member:read` | `GET /api/users/captains`, `GET /api/users/{id}` | `@PreAuthorize ROLE_ADMIN` |
+| `member:create` | `POST /api/users` | `@PreAuthorize ROLE_ADMIN` |
+| `member:update` | `PATCH /api/users/{id}` | `@PreAuthorize ROLE_ADMIN` |
+| `member:password` | `PATCH /api/users/{id}/password` | `@PreAuthorize ROLE_ADMIN` |
+| `member:toggle` | `PATCH /api/users/{id}/toggle` | `@PreAuthorize ROLE_ADMIN` |
+| `member:delete` | `DELETE /api/users/{id}` | `@PreAuthorize ROLE_ADMIN` |
+| `profile:self` | `GET/PATCH /api/auth/me` | Any authenticated user, **self only** (username resolved from `Authentication`) |
+
+### 4.3 Access Control Matrix
+
+Legend: **C** = Create, **R** = Read, **U** = Update, **D** = Delete. "Owned sport" = sport in the user's `sport_captains` set.
+
+| Role | Entity / Resource | C | R | U | D | Scope / Conditions |
+| :--- | :--- | :-: | :-: | :-: | :-: | :--- |
+| **ADMIN** | Sports | ✔ | ✔ | ✔ | ✔ | Global — all programs |
+| **ADMIN** | Sport captains (assign/remove) | ✔ | ✔ | ✔ | ✔ | Global; ≤3/sport |
+| **ADMIN** | Players | ✔ | ✔ | ✔ | ✔ | Global — every sport |
+| **ADMIN** | Training sessions | ✔ | ✔ | ✔ | ✔ | Global |
+| **ADMIN** | Attendance | ✔ | ✔ | ✔ | ✔ | Global (reads + records as any captain) |
+| **ADMIN** | Captains/Users (accounts) | ✔ | ✔ | ✔ | ✔ | Global only — sole role with `member:*` |
+| **ADMIN** | Own profile | — | ✔ | ✔ | — | Self (`/api/auth/me`) |
+| **CAPTAIN** | Sports | — | ✔ | — | — | Only sports where `sport_captains` contains them; `GET /api/sports` (unscoped) and `/active` do leak all names |
+| **CAPTAIN** | Sport captains | — | — | — | — | **No access** — cannot read/modify assignments |
+| **CAPTAIN** | Players | ✔ | ✔ | ✔ | ✔ | Only players whose `sport` is an owned sport |
+| **CAPTAIN** | Training sessions | ✔ | ✔ | ✔ | ✔ | Only sessions whose `sport` is an owned sport |
+| **CAPTAIN** | Attendance | ✔ | ✔ | ✔ | ✔ | Session/player must belong to owned sport |
+| **CAPTAIN** | Users/Accounts | — | — | — | — | **No access** (all `member:*` are admin-only) |
+| **CAPTAIN** | Own profile | — | ✔ | ✔ | — | Self; password change requires current password |
+
+**Two-layer enforcement model (defense in depth):**
+1. **Role gate** — `@PreAuthorize` (method) + `authorizeHttpRequests` (URL) filter.
+2. **Ownership gate** — hand-rolled `isCaptainOfSport/Session/Player` helpers inside controllers, resolving the current `User` from `Authentication` and testing membership via `Sport.hasCaptain(user)`; admins short-circuit to `true`. Denied ⇒ 403 (`ResponseEntity.status(FORBIDDEN)` or `AccessDeniedException`).
+
+### 4.4 Hardening Observations (derived from code inspection)
+
+| # | Gap | Recommended Production Pattern |
+| :-: | :--- | :--- |
+| 1 | `PATCH /api/attendance/{id}` is role-gated but **not ownership-gated** — any captain can edit an attendance row in another sport's session | Add `isCaptainOfPlayer(Session)` scope check, mirroring `saveAttendance` |
+| 2 | `GET /api/players/{playerId}/attendance/summary` performs **no scope check** — any authenticated user can query any athlete's presence count | Apply the same captain-of-player guard |
+| 3 | `GET /api/sports` (plain `listAll`) and `GET /api/sports/active` return **all sports** regardless of role (the frontend compensates by using `/my` for captains) | Either scope `listAll` by captain ownership or restrict the unscoped list to admins |
+| 4 | Deleting a **sport** transactionally destroys athletes, sessions, and all attendance history (cascade) with only a client-side confirmation | Prefer soft-delete (`active=false`) + archive, or a two-step confirm with server-side guard when the sport has activity |
+| 5 | Basic-auth credentials are re-encoded and stored **recoverably** in `sessionStorage` (XSS-readable); no server-side session for the SPA | Migrate to token/session auth (e.g. Spring Session + cookie or JWT) and `Secure` storage |
+| 6 | **`demoteFromCaptain` passes the wrong id** — `removeCaptain(sport.getId(), player.getSportId())` (`PlayerService.java:144`) never removes the intended captain from `sport_captains` | Resolve the linked `User` (via player email/username) and pass that user id; add an integration test asserting the join row disappears |
+| 7 | `RoleGuard` renders `children` before the role check resolves — a wrong-role user **briefly sees admin UI** before being redirected | Render `null` until the role check completes (backend 403 stays authoritative) |
+| 8 | No `@ControllerAdvice` — inconsistent error shapes across controllers | Add a `@RestControllerAdvice` with a uniform error envelope |
+
+> Implemented RBAC is **positive enforcement** (allow-lists). Session-fixation, CSRF (disabled for `/api/**`), and 1-session-per-user limits are already handled by Spring Security defaults.
+
+---
+
+## 5. View & UI Content Exposure Matrix
+
+### 5.1 Route & Navigation Map
+
+| Route | Screen | `ROLE_ADMIN` | `ROLE_CAPTAIN` | Guard mechanism |
+| :--- | :--- | :---: | :---: | :--- |
+| `/login` | Sign-in (brand panel + form) | ✔ | ✔ | `PublicRoute` — redirects to `/dashboard` if already authenticated |
+| `/dashboard` | Executive overview | ✔ | ✔ | `AuthRoute` (authenticated) |
+| `/roster` | Athletes & sport rosters | ✔ | ✔ | `AuthRoute` |
+| `/attendance` | Attendance Register | ✔ | ✔ | `AuthRoute` |
+| `/profile` | My Profile | ✔ | ✔ | `AuthRoute` |
+| `/admin` | Administration | ✔ | ✗ | **Route-level** `RoleGuard requiredRole="ROLE_ADMIN"` + backend 403 |
+| `*` | 404 | ✔ | ✔ | `NotFoundPage` |
+
+**Sidebar (`Sidebar.tsx`):** nav items carry `requiredRole`; the *"Admin"* item is set to `ROLE_ADMIN`, so it is dropped from a captain's menu. The sidebar also renders the role label (`Administrator` vs `Captain`), and the `Header` swaps the portal title (`Administration Portal` vs `Captain Portal`) plus an `ADMIN`/`CAPTAIN` chip. **Defense in depth:** nav hiding is cosmetic — URL-level `RoleGuard` and server `@PreAuthorize`/scope checks remain authoritative.
+
+### 5.2 Field-Level Visibility & UI Controls
+
+#### Global / shared screens
+
+| Screen | Control / Field | `ROLE_ADMIN` | `ROLE_CAPTAIN` |
+| :--- | :--- | :--- | :--- |
+| **Dashboard** | Sports stat card | "Sports Programs" (all) | "My Assigned Sports" (own count) |
+| | Coaches & Captains stat | Real captain count + list | Fixed `1` ("Your coach account") — **captain roster counts hidden** |
+| | Sessions table | All sports' upcoming sessions | Only owned sports' upcoming sessions (client-side filter `mySportIds`) |
+| **Roster** | Sport selector | **Dropdown** over all sports | **Fixed label** "Your Assigned Sport" — no selector |
+| | Coach display | — | Shows `currentSport.captain.fullName` (or "Unassigned") |
+| | Roster actions | Register / Edit / Delete athlete | Register / Edit / Delete **within owned sport** (backend permits Captain+scope) |
+| | Athlete details sheet | Full contact + DOB + notes + attendance history | Same — scoped athlete |
+| **Attendance** | Sport selector | Dropdown | Fixed label (own sport) |
+| | "Schedule Session" | ✔ | ✔ (allowed for captains of the sport — `session:create`) |
+| | "Delete Session" | ✔ | ✔ (captains may delete — `session:delete`, scoped) |
+| | Status grid | `PRESENT / LATE / ABSENT / EXCUSED` pills + live summary counts | Identical, scoped to own session |
+| **Profile** | Contact details (fullName/email/phone) | ✔ editable | ✔ editable |
+| | Change password (current + new) | ✔ (min 6 chars, confirmation) | ✔ — client re-encodes new Basic token into `sessionStorage` so the session survives the rotation |
+| **Login** | Branding | "University Athletics / Sports Camp Attendance System"; footer "Authorized personnel only. All activity is monitored." | identical |
+
+#### Administration screen (`/admin` — **admin-only route**)
+
+| Module | Control | Exposure |
+| :--- | :--- | :--- |
+| **Captains & Coaches tab** | Create captain account | Fully editable — username, temporary password, full name, email, phone |
+| | Captain table | Full contact (`@username`, email, phone), assigned-sport badge, ACTIVE/INACTIVE status |
+| | Row actions | Assign Sport, Edit, Reset Password, **Disable/Enable**, Delete |
+| | "Promote Player to Captain" | Global player search → pick sport → confirm with chosen credentials (capped at 3 captains/sport, UI shows `x/3` counter and disables the button at saturation) |
+| **Sports Programs tab** | Create sport, activate/deactivate, delete | Exclusive |
+| | Captains/Admins per sport | Add/Remove with live `x / 3` slot counter; "Add Admin" disabled when full or when zero captains exist |
+| | Expandable player section | View per-sport roster inline with **Edit / Promote / Demote** per athlete |
+| | Demote | Intended to remove the captain-sport association; the `users` account survives — **⚠ blocked by the §4.4 #6 defect** |
+
+**What a captain never sees in any screen:** the Admin nav item, `/admin` route, captain/account management, captain-to-sport assignments, cross-sport data, global sport/session/player lists beyond owned scope, and user-direct endpoints (`/api/users/**`). Field reduction on the wire (all rows shaped at the controller/repository, sensitive nested graphs `@JsonIgnore`d) backs the UI hiding at the API layer.
+
+---
+
+## Appendix A — Context Notes
+
+- **React Query wiring** (`main.tsx`): `staleTime 5 min`, `retry: 2`, `refetchOnWindowFocus: false`; mutations invalidate exact namespaced keys (`['sports', sportId, 'players']`, `['sessions', sessionId, 'attendance']`) or broad predicates (`q.queryKey[0] === 'sessions'`).
+- **No React Context / provider** for auth: `useAuth` hook + `sessionStorage` is the entire auth layer.
+- **Client-persisted username map** ("Already captain" detection in the promote dialog) matches player emails against captain stored usernames.
+- **Dead/unreferenced code paths** (no controller caller): `PlayerService.findActiveBySport`/`deactivate`, `PlayerRepository.countBySportIdAndActiveTrue`, `SportService.findByCaptainUsername`, `AttendanceRepository.countPresentBySport`, `TrainingSessionRepository.findBySportIdAndSessionDateBetween`, and the entire `player_evaluations` API surface.

@@ -62,9 +62,19 @@ export interface CaptainResult {
 export function usePromotePlayerToCaptain() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ sportId, playerId, password }: { sportId: number; playerId: number; password: string }) =>
+    mutationFn: ({
+      sportId,
+      playerId,
+      username,
+      password,
+    }: {
+      sportId: number
+      playerId: number
+      username: string
+      password: string
+    }) =>
       api
-        .post(`/api/sports/${sportId}/players/${playerId}/promote-captain`, { password })
+        .post(`/api/sports/${sportId}/players/${playerId}/promote-captain`, { username, password })
         .then((r) => r.data as CaptainResult),
     onSuccess: (_data, variables) => {
       qc.invalidateQueries({ queryKey: ['sports', variables.sportId, 'players'] })

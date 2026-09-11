@@ -60,11 +60,13 @@ export default function AdminPage() {
     open: boolean
     sportId: number | null
     player: Player | null
+    username: string
     password: string
   }>({
     open: false,
     sportId: null,
     player: null,
+    username: '',
     password: '',
   })
   const [createSportOpen, setCreateSportOpen] = useState(false)
@@ -356,14 +358,18 @@ export default function AdminPage() {
     })
   }
 
-  // Open the password-confirmation dialog to promote a player to captain
+  // Open the confirmation dialog to promote a player to captain
   const openPromoteConfirm = (sportId: number, player: Player) => {
-    setPromoteConfirm({ open: true, sportId, player, password: '' })
+    setPromoteConfirm({ open: true, sportId, player, username: '', password: '' })
   }
 
-  // Confirm the promotion with the admin-typed password
+  // Confirm the promotion with the admin-typed username and password
   const handleConfirmPromote = async () => {
     if (!promoteConfirm.player || !promoteConfirm.sportId) return
+    if (!promoteConfirm.username.trim()) {
+      toast.error('Enter a username for the new captain account.')
+      return
+    }
     if (!promoteConfirm.password.trim()) {
       toast.error('Enter a password for the new captain account.')
       return
@@ -374,10 +380,11 @@ export default function AdminPage() {
       await promoteToCaptain.mutateAsync({
         sportId,
         playerId: player.id,
+        username: promoteConfirm.username.trim(),
         password: promoteConfirm.password.trim(),
       })
-      toast.success(`"${player.fullName}" promoted to captain with the password you set.`)
-      setPromoteConfirm({ open: false, sportId: null, player: null, password: '' })
+      toast.success(`"${player.fullName}" promoted to captain with the username and password you set.`)
+      setPromoteConfirm({ open: false, sportId: null, player: null, username: '', password: '' })
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to promote player.')
     }

@@ -75,44 +75,57 @@ public class PlayerService {
 
     /**
      * Promotes a player to captain: creates a User account (ROLE_CAPTAIN) using the
-     * admin-provided password and assigns them to the sport's captains list.
-     * If the player already has a captain account (matched by email), it is reused
-     * and the provided password is ignored.
+     * admin-provided username and password and assigns them to the sport's captains list.
+     * An existing captain account is reused when the typed username (or the player's
+     * email, for previously auto-created accounts) already maps to a ROLE_CAPTAIN user;
+     * in that case the provided password is left untouched.
      */
     @Transactional
-    public User promoteToCaptain(Long playerId, String rawPassword, UserService userService, SportService sportService) {
+    public User promoteToCaptain(Long playerId, String username, String rawPassword,
+                                 UserService userService, SportService sportService) {
         Player player = findById(playerId);
         Sport sport = player.getSport();
         if (sport == null) {
             throw new ResourceNotFoundException("Sport not found for player " + playerId);
         }
 
-        String username;
-        if (player.getEmail() != null && !player.getEmail().isBlank()) {
-            username = player.getEmail();
-        } else {
-            username = "player_" + playerId;
-        }
+        String resolvedUsername = (username != null && !username.isBlank()) ? username.trim() : null;
 
-        User captain;
-        if (userService.userExistsByEmail(username)) {
-            captain = userService.findUserByEmail(username);
-            if (captain.getRole() != User.Role.ROLE_CAPTAIN) {
+        // 1) Reuse an existing captain account with the chosen username
+        if (resolvedUsername != null && userService.userExistsByUsername(resolvedUsername)) {
+            User existing = userService.findByUsername(resolvedUsername);
+            if (existing.getRole() != User.Role.ROLE_CAPTAIN) {
                 throw new IllegalStateException(
-                        "User with email " + username + " exists but is not a captain.");
+                        "Username \"" + resolvedUsername + "\" is taken by a non-captain user.");
             }
-            // Reusing existing account — password is left unchanged.
-        } else {
-            if (rawPassword == null || rawPassword.isBlank()) {
-                throw new IllegalArgumentException("A password is required to create the new captain account.");
-            }
-            captain = userService.createUser(
-                    username, rawPassword,
-                    player.getFullName(), player.getEmail(), player.getPhone(),
-                    User.Role.ROLE_CAPTAIN
-            );
+            sportService.assignCaptain(sport.getId(), existing);
+            return existing;
         }
 
+        // 2) Reuse a captain account previously created from this player's email
+        if (player.getEmail() != null && !player.getEmail().isBlank()
+                && userService.userExistsByEmail(player.getEmail())) {
+            User existing = userService.findUserByEmail(player.getEmail());
+            if (existing.getRole() != User.Role.ROLE_CAPTAIN) {
+                throw new IllegalStateException(
+                        "User with email " + player.getEmail() + " exists but is not a captain.");
+            }
+            sportService.assignCaptain(sport.getId(), existing);
+            return existing;
+        }
+
+        // 3) Create a brand-new captain account with the admin-provided credentials
+        if (resolvedUsername == null) {
+            throw new IllegalArgumentException("A username is required to create the new captain account.");
+        }
+        if (rawPassword == null || rawPassword.isBlank()) {
+            throw new IllegalArgumentException("A password is required to create the new captain account.");
+        }
+        User captain = userService.createUser(
+                resolvedUsername, rawPassword,
+                player.getFullName(), player.getEmail(), player.getPhone(),
+                User.Role.ROLE_CAPTAIN
+        );
         sportService.assignCaptain(sport.getId(), captain);
         return captain;
     }
@@ -122,12 +135,18 @@ public class PlayerService {
      * The User account itself is NOT deleted.
      */
     @Transactional
-    public void demoteFromCaptain(Long playerId, SportService sportService) {
+    public void demoteFromCaptain(Long playerId, SportService sportService, UserService userService) {
         Player player = findById(playerId);
         Sport sport = player.getSport();
         if (sport == null) {
             throw new ResourceNotFoundException("Sport not found for player " + playerId);
         }
-        sportService.removeCaptain(sport.getId(), player.getSportId());
+
+        // The captain User is linked to the Player via email.
+        if (player.getEmail() == null || player.getEmail().isBlank()) {
+            throw new IllegalStateException("Player " + playerId + " has no email; cannot resolve captain account.");
+        }
+        User captain = userService.findUserByEmail(player.getEmail());
+        sportService.removeCaptain(sport.getId(), captain.getId());
     }
 }
