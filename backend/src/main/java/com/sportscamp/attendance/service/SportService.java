@@ -1,9 +1,11 @@
 package com.sportscamp.attendance.service;
 
+import com.sportscamp.attendance.dto.SportOverviewDTO;
+import com.sportscamp.attendance.entity.Player;
 import com.sportscamp.attendance.entity.Sport;
-import com.sportscamp.attendance.entity.User;
 import com.sportscamp.attendance.exception.DuplicateResourceException;
 import com.sportscamp.attendance.exception.ResourceNotFoundException;
+import com.sportscamp.attendance.repository.PlayerRepository;
 import com.sportscamp.attendance.repository.SportRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -19,6 +21,7 @@ public class SportService {
     private static final int MAX_CAPTAINS_PER_SPORT = 3;
 
     private final SportRepository sportRepository;
+    private final PlayerRepository playerRepository;
 
     public List<Sport> findAll() {
         return sportRepository.findAllWithCaptains();
@@ -33,12 +36,9 @@ public class SportService {
                 .orElseThrow(() -> new ResourceNotFoundException("Sport", id));
     }
 
-    public List<Sport> findByCaptainId(Long captainId) {
-        return sportRepository.findByCaptainId(captainId);
-    }
-
-    public List<Sport> findByCaptainUsername(String username) {
-        return sportRepository.findByCaptainUsername(username);
+    /** Sports where the given PLAYER is a captain. */
+    public List<Sport> findByCaptainId(Long playerId) {
+        return sportRepository.findByCaptainId(playerId);
     }
 
     @Transactional
@@ -59,31 +59,70 @@ public class SportService {
     }
 
     /**
-     * Add a captain to a sport. Fails if the sport already has 3 captains.
+     * Add a player as captain of a sport. Fails if the sport already has 3 captains, or if
+     * the player already captains a different sport (a player may captain at most one sport —
+     * enforced both here and by the {@code uk_captain_single_sport} DB constraint).
      */
     @Transactional
-    public Sport assignCaptain(Long sportId, User captain) {
+    public Sport assignCaptain(Long sportId, Player captain) {
         Sport sport = findById(sportId);
         if (sport.getCaptains().size() >= MAX_CAPTAINS_PER_SPORT) {
             throw new IllegalStateException(
                     "Sport \"" + sport.getName() + "\" already has " + MAX_CAPTAINS_PER_SPORT
                     + " captains. Remove one before adding another.");
         }
-        if (sport.getCaptains().contains(captain)) {
-            return sport;
+        if (sport.getCaptains().stream().anyMatch(c -> c.getId().equals(captain.getId()))) {
+            return sport; // already a captain of this sport
+        }
+        List<Sport> alreadyCaptaining = sportRepository.findByCaptainId(captain.getId());
+        if (!alreadyCaptaining.isEmpty() && !alreadyCaptaining.get(0).getId().equals(sportId)) {
+            throw new IllegalStateException(
+                    "Player \"" + captain.getFullName() + "\" is already captain of \""
+                    + alreadyCaptaining.get(0).getName() + "\". A player may captain only one sport.");
         }
         sport.getCaptains().add(captain);
         return sportRepository.save(sport);
     }
 
     /**
-     * Remove a captain from a sport.
+     * Remove a captain (player id) from a sport.
      */
     @Transactional
-    public Sport removeCaptain(Long sportId, Long captainId) {
+    public Sport removeCaptain(Long sportId, Long captainPlayerId) {
         Sport sport = findById(sportId);
-        sport.getCaptains().removeIf(c -> c.getId().equals(captainId));
+        sport.getCaptains().removeIf(c -> c.getId().equals(captainPlayerId));
         return sportRepository.save(sport);
+    }
+
+    /**
+     * Is the given player a captain of the given sport?
+     */
+    public boolean isCaptain(Long sportId, Long playerId) {
+        return sportRepository.findByIdWithCaptains(sportId)
+                .map(s -> s.hasCaptainByPlayerId(playerId))
+                .orElse(false);
+    }
+
+    /**
+     * Admin overview: all active sports with their roster counts and assigned player-captains.
+     */
+    public List<SportOverviewDTO> getOverview() {
+        return sportRepository.findByActiveTrue().stream()
+                .map(sport -> {
+                    List<SportOverviewDTO.CaptainInfo> captains = sport.getCaptains().stream()
+                            .map(c -> new SportOverviewDTO.CaptainInfo(c.getId(), c.getFullName(), c.getEmail()))
+                            .toList();
+                    long totalPlayers = playerRepository.countBySportId(sport.getId());
+                    return new SportOverviewDTO(
+                            sport.getId(),
+                            sport.getName(),
+                            sport.getDescription(),
+                            sport.isActive(),
+                            totalPlayers,
+                            captains
+                    );
+                })
+                .toList();
     }
 
     @Transactional

@@ -29,7 +29,7 @@ public class Attendance extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "player_id", nullable = false)
-    @JsonIgnoreProperties({"attendances","evaluations","team","hibernateLazyInitializer"})
+    @JsonIgnoreProperties({"sports","attendances","evaluations","team","hibernateLazyInitializer"})
     private Player player;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)

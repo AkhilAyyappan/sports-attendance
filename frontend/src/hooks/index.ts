@@ -3,6 +3,7 @@ export {
   useSports,
   useActiveSports,
   useMySports,
+  useSportsOverview,
   useCreateSport,
   useUpdateSport,
   useAssignCaptainToSport,
@@ -20,6 +21,7 @@ export {
 export {
   usePlayers,
   usePlayer,
+  usePlayerProfile,
   useAddPlayer,
   useUpdatePlayer,
   useDeletePlayer,

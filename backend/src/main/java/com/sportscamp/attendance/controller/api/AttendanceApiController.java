@@ -32,15 +32,11 @@ public class AttendanceApiController {
     private final PlayerService playerService;
 
     private boolean isCaptainOfSession(User user, TrainingSession session) {
-        if (user.getRole() == User.Role.ROLE_ADMIN) return true;
-        if (session.getSport() == null) return false;
-        return session.getSport().hasCaptain(user);
+        return playerService.isCaptainOfSport(user, session.getSport());
     }
 
     private boolean isCaptainOfPlayer(User user, Player player) {
-        if (user.getRole() == User.Role.ROLE_ADMIN) return true;
-        if (player.getSport() == null) return false;
-        return player.getSport().hasCaptain(user);
+        return playerService.canManage(user, player);
     }
 
     /** GET /api/sessions/{sessionId}/attendance */

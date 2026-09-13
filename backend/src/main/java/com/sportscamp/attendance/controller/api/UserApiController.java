@@ -1,8 +1,10 @@
 package com.sportscamp.attendance.controller.api;
 
+import com.sportscamp.attendance.entity.Player;
 import com.sportscamp.attendance.entity.Sport;
 import com.sportscamp.attendance.entity.User;
 import com.sportscamp.attendance.exception.DuplicateResourceException;
+import com.sportscamp.attendance.service.PlayerService;
 import com.sportscamp.attendance.service.SportService;
 import com.sportscamp.attendance.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +26,7 @@ public class UserApiController {
 
     private final UserService userService;
     private final SportService sportService;
+    private final PlayerService playerService;
 
     /** GET /api/users/captains */
     @GetMapping("/captains")
@@ -41,7 +44,11 @@ public class UserApiController {
             map.put("enabled", c.isEnabled());
             map.put("active", c.isEnabled());
 
-            List<Sport> assignedSports = sportService.findByCaptainId(c.getId());
+            // Captains are stored as PLAYERS; a captain User's Player row is resolved by email.
+            Player captainPlayer = playerService.findByEmail(c.getEmail()).orElse(null);
+            List<Sport> assignedSports = captainPlayer == null
+                    ? List.of()
+                    : sportService.findByCaptainId(captainPlayer.getId());
             List<Map<String, Object>> sportsList = assignedSports.stream()
                     .map(s -> Map.<String, Object>of("id", s.getId(), "name", s.getName()))
                     .toList();

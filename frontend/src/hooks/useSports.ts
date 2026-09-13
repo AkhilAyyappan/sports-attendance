@@ -24,6 +24,23 @@ export function useMySports() {
   })
 }
 
+export interface SportOverview {
+  id: number
+  name: string
+  description: string
+  active: boolean
+  totalPlayers: number
+  captains: { id: number; fullName: string; email?: string }[]
+}
+
+/** GET /api/sports/overview — admin dashboard: active sports, roster counts, and captains. */
+export function useSportsOverview() {
+  return useQuery({
+    queryKey: ['sports', 'overview'],
+    queryFn: () => api.get('/api/sports/overview').then((r) => r.data as SportOverview[]),
+  })
+}
+
 export function useCreateSport() {
   const qc = useQueryClient()
   return useMutation({

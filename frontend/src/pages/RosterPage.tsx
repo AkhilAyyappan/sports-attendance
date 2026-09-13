@@ -18,12 +18,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet'
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -33,8 +27,10 @@ import {
 } from '@/components/ui/dialog'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
-import { useSports, useMySports, usePlayers, usePlayerAttendance, usePlayerAttendanceSummary, useAddPlayer, useDeletePlayer, useUpdatePlayer, useAuth } from '@/hooks'
-import { UserPlus, Trophy, Shield, Phone, Mail, FileText, User, Trash2, Pencil } from 'lucide-react'
+import { PlayerProfileSheet } from '@/components/shared/PlayerProfileSheet'
+import { PromoteCaptainModal } from '@/components/shared/PromoteCaptainModal'
+import { useSports, useMySports, usePlayers, useAddPlayer, useDeletePlayer, useUpdatePlayer, useAuth } from '@/hooks'
+import { UserPlus, Trophy, Shield, Trash2, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import { type Player } from '@/types'
 
@@ -67,7 +63,9 @@ export default function RosterPage() {
     position: '',
     phone: '',
     email: '',
+    department: '',
     notes: '',
+    sportIds: [] as number[],
   })
 
   const [playerForm, setPlayerForm] = useState({
@@ -76,7 +74,9 @@ export default function RosterPage() {
     position: '',
     phone: '',
     email: '',
+    department: '',
     notes: '',
+    sportIds: [] as number[],
   })
 
   // Auto-select first sport once loaded
@@ -94,9 +94,37 @@ export default function RosterPage() {
   const deletePlayerMutation = useDeletePlayer()
   const updatePlayerMutation = useUpdatePlayer()
 
+  // Captain promotion is credentialed (unified with Admin): opens a modal that collects
+  // username + password and posts to the promote-captain endpoint.
+  const [promoteOpen, setPromoteOpen] = useState(false)
+
+  const openAddPlayer = () => {
+    // No sport is pre-selected or forced — every sport is an optional checkbox.
+    setPlayerForm((prev) => ({ ...prev, sportIds: [] }))
+    setAddPlayerOpen(true)
+  }
+
+  const togglePlayerSport = (sportId: number) => {
+    setPlayerForm((prev) => ({
+      ...prev,
+      sportIds: prev.sportIds.includes(sportId)
+        ? prev.sportIds.filter((id) => id !== sportId)
+        : [...prev.sportIds, sportId],
+    }))
+  }
+
+  const toggleEditPlayerSport = (sportId: number) => {
+    setEditPlayerForm((prev) => ({
+      ...prev,
+      sportIds: prev.sportIds.includes(sportId)
+        ? prev.sportIds.filter((id) => id !== sportId)
+        : [...prev.sportIds, sportId],
+    }))
+  }
+
   const handleAddPlayer = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!selectedSportId || !playerForm.fullName.trim()) {
+    if (!playerForm.fullName.trim()) {
       toast.error('Please enter player full name.')
       return
     }
@@ -109,13 +137,32 @@ export default function RosterPage() {
           position: playerForm.position.trim(),
           phone: playerForm.phone.trim(),
           email: playerForm.email.trim(),
+          department: playerForm.department.trim() || undefined,
           notes: playerForm.notes.trim(),
           active: true,
+          sportIds: playerForm.sportIds,
         },
       })
-      toast.success(`Player ${playerForm.fullName} registered for ${currentSport?.name}.`)
+      const sportNames = playerForm.sportIds
+        .map((id) => sports.find((s) => s.id === id)?.name)
+        .filter(Boolean)
+        .join(', ')
+      toast.success(
+        sportNames
+          ? `Player ${playerForm.fullName} registered for ${sportNames}.`
+          : `Player ${playerForm.fullName} registered. Assign sports anytime via Edit.`
+      )
       setAddPlayerOpen(false)
-      setPlayerForm({ fullName: '', jerseyNumber: '', position: '', phone: '', email: '', notes: '' })
+      setPlayerForm({
+        fullName: '',
+        jerseyNumber: '',
+        position: '',
+        phone: '',
+        email: '',
+        department: '',
+        notes: '',
+        sportIds: [],
+      })
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to add player.')
     }
@@ -130,7 +177,9 @@ export default function RosterPage() {
       position: player.position ?? '',
       phone: player.phone ?? '',
       email: player.email ?? '',
+      department: player.department ?? '',
       notes: player.notes ?? '',
+      sportIds: player.sports?.map((s) => s.id) ?? (player.sportId ? [player.sportId] : []),
     })
   }
 
@@ -151,7 +200,9 @@ export default function RosterPage() {
           position: editPlayerForm.position || undefined,
           phone: editPlayerForm.phone || undefined,
           email: editPlayerForm.email || undefined,
+          department: editPlayerForm.department || undefined,
           notes: editPlayerForm.notes || undefined,
+          sportIds: editPlayerForm.sportIds,
         },
       })
       toast.success(`Athlete ${editPlayerForm.fullName} updated.`)
@@ -159,6 +210,11 @@ export default function RosterPage() {
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to update player.')
     }
+  }
+
+  const openPromoteModal = () => {
+    if (!selectedPlayer || !currentSport) return
+    setPromoteOpen(true)
   }
 
   const handleDeletePlayer = async () => {
@@ -201,7 +257,7 @@ export default function RosterPage() {
         </div>
         {selectedSportId && (
           <Button
-            onClick={() => setAddPlayerOpen(true)}
+            onClick={openAddPlayer}
             className="bg-accent hover:bg-accent-light text-white font-sans text-xs gap-1.5 self-start sm:self-auto"
           >
             <UserPlus className="h-4 w-4" />
@@ -247,7 +303,14 @@ export default function RosterPage() {
           <div className="flex items-center gap-4 text-xs font-sans">
             <div className="flex items-center gap-1.5 text-slate-600">
               <Shield className="h-3.5 w-3.5 text-accent" />
-              <span>Coach: <strong>{currentSport.captain?.fullName || 'Unassigned'}</strong></span>
+              <span>
+                Captain:{' '}
+                <strong>
+                  {(currentSport.captains?.length ?? 0) > 0
+                    ? currentSport.captains!.map((c) => c.fullName).join(', ')
+                    : 'Unassigned'}
+                </strong>
+              </span>
             </div>
             <div className="text-slate-400">|</div>
             <div className="text-slate-600">
@@ -275,7 +338,7 @@ export default function RosterPage() {
               No athletes registered for {currentSport?.name || 'this sport'} yet.
             </p>
             <Button
-              onClick={() => setAddPlayerOpen(true)}
+              onClick={openAddPlayer}
               className="mt-4 bg-accent hover:bg-accent-light text-white font-sans text-xs"
             >
               Register First Athlete
@@ -373,10 +436,10 @@ export default function RosterPage() {
             <DialogHeader>
               <DialogTitle className="font-serif flex items-center gap-2">
                 <UserPlus className="h-5 w-5 text-accent" />
-                Register Athlete for {currentSport?.name}
+                Register Athlete
               </DialogTitle>
               <DialogDescription>
-                Add athlete details to the roster. Note: Captains/Coaches can also be added as team athletes.
+                Add athlete details to the roster. Sport assignments are optional — pick none, one, or several.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-3.5 my-4">
@@ -405,13 +468,22 @@ export default function RosterPage() {
                   <Label htmlFor="position" className="text-xs font-sans text-slate-700">Position / Role</Label>
                   <Input
                     id="position"
-                    placeholder="e.g. Forward / Striker / Player-Coach"
+                    placeholder="e.g. Forward / Striker / Goalkeeper"
                     value={playerForm.position}
                     onChange={(e) => setPlayerForm({ ...playerForm, position: e.target.value })}
                   />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="playerDepartment" className="text-xs font-sans text-slate-700">Department / Team</Label>
+                  <Input
+                    id="playerDepartment"
+                    placeholder="e.g. U-15, Senior Men"
+                    value={playerForm.department}
+                    onChange={(e) => setPlayerForm({ ...playerForm, department: e.target.value })}
+                  />
+                </div>
                 <div className="space-y-1">
                   <Label htmlFor="playerEmail" className="text-xs font-sans text-slate-700">Email</Label>
                   <Input
@@ -422,6 +494,8 @@ export default function RosterPage() {
                     onChange={(e) => setPlayerForm({ ...playerForm, email: e.target.value })}
                   />
                 </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label htmlFor="playerPhone" className="text-xs font-sans text-slate-700">Phone</Label>
                   <Input
@@ -431,15 +505,42 @@ export default function RosterPage() {
                     onChange={(e) => setPlayerForm({ ...playerForm, phone: e.target.value })}
                   />
                 </div>
+                <div className="space-y-1">
+                  <Label htmlFor="playerNotes" className="text-xs font-sans text-slate-700">Notes / Medical Info</Label>
+                  <Input
+                    id="playerNotes"
+                    placeholder="e.g. Left-footed, also captain"
+                    value={playerForm.notes}
+                    onChange={(e) => setPlayerForm({ ...playerForm, notes: e.target.value })}
+                  />
+                </div>
               </div>
-              <div className="space-y-1">
-                <Label htmlFor="notes" className="text-xs font-sans text-slate-700">Notes / Medical Info</Label>
-                <Input
-                  id="notes"
-                  placeholder="e.g. Left-footed, also captain"
-                  value={playerForm.notes}
-                  onChange={(e) => setPlayerForm({ ...playerForm, notes: e.target.value })}
-                />
+              <div className="space-y-1.5">
+                <Label className="text-xs font-sans text-slate-700">Sport(s)</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {sports.map((sport) => {
+                    const checked = playerForm.sportIds.includes(sport.id)
+                    return (
+                      <label
+                        key={sport.id}
+                        className={`flex items-center gap-2 px-2.5 py-2 rounded-md border cursor-pointer text-xs font-sans transition-colors ${
+                          checked ? 'border-accent bg-accent/5' : 'border-border bg-surface'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => togglePlayerSport(sport.id)}
+                          className="accent-accent h-3.5 w-3.5"
+                        />
+                        <span className="flex-1 truncate">{sport.name}</span>
+                      </label>
+                    )
+                  })}
+                </div>
+                <p className="text-[11px] text-slate-400 font-sans">
+                  Optional — check none, one, or several sports. You can change assignments later from Edit.
+                </p>
               </div>
             </div>
             <DialogFooter>
@@ -522,15 +623,54 @@ export default function RosterPage() {
                   />
                 </div>
               </div>
-              <div className="space-y-1">
-                <Label htmlFor="editRosterEmail" className="text-xs font-sans text-slate-700">Email</Label>
-                <Input
-                  id="editRosterEmail"
-                  type="email"
-                  value={editPlayerForm.email}
-                  onChange={(e) => setEditPlayerForm({ ...editPlayerForm, email: e.target.value })}
-                  className="h-8 text-xs font-sans"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="editRosterDepartment" className="text-xs font-sans text-slate-700">Department / Team</Label>
+                  <Input
+                    id="editRosterDepartment"
+                    value={editPlayerForm.department}
+                    onChange={(e) => setEditPlayerForm({ ...editPlayerForm, department: e.target.value })}
+                    placeholder="e.g. U-15, Senior Men"
+                    className="h-8 text-xs font-sans"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="editRosterEmail" className="text-xs font-sans text-slate-700">Email</Label>
+                  <Input
+                    id="editRosterEmail"
+                    type="email"
+                    value={editPlayerForm.email}
+                    onChange={(e) => setEditPlayerForm({ ...editPlayerForm, email: e.target.value })}
+                    className="h-8 text-xs font-sans"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-sans text-slate-700">Sport(s)</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {sports.map((sport) => {
+                    const checked = editPlayerForm.sportIds.includes(sport.id)
+                    return (
+                      <label
+                        key={sport.id}
+                        className={`flex items-center gap-2 px-2.5 py-2 rounded-md border cursor-pointer text-xs font-sans transition-colors ${
+                          checked ? 'border-accent bg-accent/5' : 'border-border bg-surface'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleEditPlayerSport(sport.id)}
+                          className="accent-accent h-3.5 w-3.5"
+                        />
+                        <span className="flex-1 truncate">{sport.name}</span>
+                      </label>
+                    )
+                  })}
+                </div>
+                <p className="text-[11px] text-slate-400 font-sans">
+                  Select all sports this athlete participates in. Can be left empty; removing a sport also removes captain assignments within it.
+                </p>
               </div>
               <div className="space-y-1">
                 <Label htmlFor="editRosterNotes" className="text-xs font-sans text-slate-700">Notes</Label>
@@ -583,106 +723,26 @@ export default function RosterPage() {
       </Dialog>
 
       {/* PLAYER DETAILS SHEET */}
-      <Sheet open={!!selectedPlayer} onOpenChange={(open) => !open && setSelectedPlayer(null)}>
-        <SheetContent className="w-[85vw] sm:w-[400px]">
-          {selectedPlayer && (
-            <div className="space-y-6 pt-6">
-              <SheetHeader>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="h-12 w-12 rounded-full bg-surface border border-border flex items-center justify-center font-mono font-bold text-lg text-brand-900">
-                      {selectedPlayer.jerseyNumber || <User className="h-5 w-5 text-slate-400" />}
-                    </div>
-                    <div>
-                      <SheetTitle className="font-serif text-xl font-bold text-brand-900">
-                        {selectedPlayer.fullName}
-                      </SheetTitle>
-                      <p className="text-xs text-slate-500 font-sans mt-0.5">
-                        {selectedPlayer.position || 'Athlete'} · {currentSport?.name}
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="text-xs h-7 text-rose-600 hover:bg-rose-50 border-rose-200"
-                    onClick={() => setDeletePlayerDialog({ open: true, player: selectedPlayer })}
-                  >
-                    <Trash2 className="h-3.5 w-3.5 mr-1" />
-                    Delete
-                  </Button>
-                </div>
-              </SheetHeader>
+      <PlayerProfileSheet
+        player={selectedPlayer}
+        sportId={currentSport?.id ?? null}
+        sportName={currentSport?.name}
+        open={!!selectedPlayer}
+        onOpenChange={(open) => !open && setSelectedPlayer(null)}
+        showPromote
+        canPromote={(currentSport?.captains?.length ?? 0) < 3}
+        onPromote={openPromoteModal}
+        onDeletePlayer={selectedPlayer ? () => setDeletePlayerDialog({ open: true, player: selectedPlayer }) : undefined}
+      />
 
-              <div className="space-y-4 text-sm font-sans">
-                <div className="p-3 bg-surface rounded-lg border border-border space-y-2">
-                  <div className="flex items-center gap-2 text-xs text-slate-600">
-                    <Mail className="h-3.5 w-3.5 text-slate-400" />
-                    <span>{selectedPlayer.email || 'No email registered'}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-slate-600">
-                    <Phone className="h-3.5 w-3.5 text-slate-400" />
-                    <span>{selectedPlayer.phone || 'No phone registered'}</span>
-                  </div>
-                  {selectedPlayer.notes && (
-                    <div className="flex items-start gap-2 text-xs text-slate-600 pt-1 border-t border-border">
-                      <FileText className="h-3.5 w-3.5 text-slate-400 mt-0.5" />
-                      <span>{selectedPlayer.notes}</span>
-                    </div>
-                  )}
-                </div>
-
-                <PlayerAttendanceHistory playerId={selectedPlayer.id} />
-              </div>
-            </div>
-          )}
-        </SheetContent>
-      </Sheet>
-    </div>
-  )
-}
-
-function PlayerAttendanceHistory({ playerId }: { playerId: number }) {
-  const { data: attendances = [], isLoading } = usePlayerAttendance(playerId)
-  const { data: summary } = usePlayerAttendanceSummary(playerId)
-
-  if (isLoading) {
-    return <LoadingSkeleton type="table" count={3} />
-  }
-
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h4 className="font-serif font-semibold text-brand-900 text-sm">Attendance History</h4>
-        <span className="text-xs font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-          {summary?.presentCount ?? 0} Sessions Present
-        </span>
-      </div>
-
-      {attendances.length === 0 ? (
-        <p className="text-xs text-slate-400">No session attendance recorded yet.</p>
-      ) : (
-        <div className="border border-border rounded overflow-hidden max-h-60 overflow-y-auto sm:overflow-x-auto">
-          <Table className="ledger-table text-xs card-table">
-            <TableHeader>
-              <TableRow className="bg-surface">
-                <TableHead>Session</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Date</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {attendances.map((a) => (
-                <TableRow key={a.id}>
-                  <TableCell data-label="Session" className="font-medium text-brand-900">{`Session #${a.sessionId}`}</TableCell>
-                  <TableCell data-label="Status"><StatusBadge status={a.status} /></TableCell>
-                  <TableCell data-label="Date" className="font-mono text-slate-400">{a.markedAt ? new Date(a.markedAt).toLocaleDateString() : '—'}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      )}
+      {/* PROMOTE CAPTAIN (with credentials) */}
+      <PromoteCaptainModal
+        open={promoteOpen}
+        onOpenChange={setPromoteOpen}
+        sport={currentSport ?? null}
+        sportCaptains={currentSport?.captains ?? (currentSport?.captain ? [currentSport.captain] : [])}
+        preselectedPlayer={selectedPlayer}
+      />
     </div>
   )
 }

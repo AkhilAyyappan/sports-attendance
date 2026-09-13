@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/api/client'
+import type { SportLite } from '@/types/sport'
 
 export interface Me {
   id: number
@@ -9,6 +10,8 @@ export interface Me {
   phone: string | null
   role: string
   enabled: boolean
+  /** Sports the caller captains (captain accounts). Returned by GET /api/auth/me. */
+  sports?: SportLite[]
 }
 
 export function useMe() {

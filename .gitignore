@@ -1,8 +1,16 @@
+# Environment variables
 .env
+
+# Build outputs & IDEs
 target/
-sports-attendance/.mvn/wrapper
-sports-attendance/mvnw
-C:\Users\akhil\Downloads\sports-attendance\sports-attendance\mvnw.cmd
-.claude
-.idea
+.claude/
+.idea/
 .sdkmanrc
+
+# Build wrappers (if unneeded)
+.mvn/wrapper
+mvnw
+mvnw.cmd
+
+# Internal documentation
+docs/technical-design.md

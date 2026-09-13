@@ -64,7 +64,7 @@ export default function DashboardPage() {
         <div>
           <h1 className="font-serif text-2xl font-semibold text-brand-900">Executive Overview</h1>
           <p className="text-slate-500 text-sm font-sans mt-1">
-            Welcome back, <span className="font-medium text-brand-800">{username}</span> ({isCaptain ? 'Captain / Coach' : 'Administrator'})
+            Welcome back, <span className="font-medium text-brand-800">{username}</span> ({isCaptain ? 'Captain' : 'Administrator'})
           </p>
         </div>
       </div>
@@ -78,9 +78,9 @@ export default function DashboardPage() {
           icon={<Trophy className="h-5 w-5 text-accent" />}
         />
         <StatCard
-          label="Coaches & Captains"
+          label="Captains"
           value={isCaptain ? 1 : totalCaptains}
-          sublabel={isCaptain ? "Your coach account" : "Authorized coaches"}
+          sublabel={isCaptain ? "Your captain account" : "Assigned captains"}
           icon={<ShieldCheck className="h-5 w-5 text-accent" />}
         />
         <StatCard

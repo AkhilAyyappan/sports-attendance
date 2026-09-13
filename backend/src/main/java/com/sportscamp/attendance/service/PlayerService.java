@@ -1,5 +1,7 @@
 package com.sportscamp.attendance.service;
 
+import com.sportscamp.attendance.dto.PlayerCreateRequest;
+import com.sportscamp.attendance.dto.PlayerProfileDTO;
 import com.sportscamp.attendance.entity.Player;
 import com.sportscamp.attendance.entity.Sport;
 import com.sportscamp.attendance.entity.User;
@@ -9,7 +11,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -40,24 +47,103 @@ public class PlayerService {
                 .orElseThrow(() -> new ResourceNotFoundException("Player", id));
     }
 
+    /**
+     * Resolve a player by email (case-insensitive). Captains are stored as PLAYERS, but login
+     * is still USER-based, so the shared {@code email} column bridges a logged-in user to their
+     * player record in the current interim captaincy model.
+     */
+    public Optional<Player> findByEmail(String email) {
+        if (email == null || email.isBlank()) return Optional.empty();
+        return playerRepository.findByEmailIgnoreCase(email);
+    }
+
+    /**
+     * Register a player and attach them to sports.
+     *
+     * @param primarySportId id from the request path ({@code null} for the generic create
+     *                       endpoint); merged with the request's {@code sportIds}.
+     * @param req            flat player fields + optional additional {@code sportIds}.
+     */
     @Transactional
-    public Player addPlayer(Player player, Long sportId) {
-        Sport sport = sportService.findById(sportId);
-        player.setSport(sport);
+    public Player createPlayer(Long primarySportId, PlayerCreateRequest req) {
+        Set<Long> sportIds = new LinkedHashSet<>();
+        if (primarySportId != null) sportIds.add(primarySportId);
+        if (req.sportIds() != null) sportIds.addAll(req.sportIds());
+        // Sport memberships are optional: a player may be registered with zero,
+        // one, or several sports (assignment can happen later via update).
+
+        Player player = new Player();
+        applyBaseFields(player, req);
+        for (Long sportId : sportIds) {
+            player.addSport(sportService.findById(sportId));
+        }
         return playerRepository.save(player);
     }
 
+    /**
+     * Update a player's profile fields and, when {@code req.sportIds()} is provided, replace
+     * their sport memberships with exactly that set.
+     */
     @Transactional
-    public Player update(Long id, Player updated) {
+    public Player update(Long id, PlayerCreateRequest req) {
         Player existing = findById(id);
-        existing.setFullName(updated.getFullName());
-        existing.setDateOfBirth(updated.getDateOfBirth());
-        existing.setJerseyNumber(updated.getJerseyNumber());
-        existing.setPosition(updated.getPosition());
-        existing.setPhone(updated.getPhone());
-        existing.setEmail(updated.getEmail());
-        existing.setNotes(updated.getNotes());
+        applyBaseFields(existing, req);
+        if (req.sportIds() != null) {
+            syncSports(existing, new LinkedHashSet<>(req.sportIds()));
+        }
         return playerRepository.save(existing);
+    }
+
+    private void syncSports(Player player, Set<Long> targetSportIds) {
+        Set<Long> currentIds = player.getSports().stream().map(Sport::getId).collect(Collectors.toSet());
+        for (Sport sport : Set.copyOf(player.getSports())) {
+            if (!targetSportIds.contains(sport.getId())) {
+                player.removeSport(sport);
+            }
+        }
+        for (Long sportId : targetSportIds) {
+            if (!currentIds.contains(sportId)) {
+                player.addSport(sportService.findById(sportId));
+            }
+        }
+    }
+
+    private void applyBaseFields(Player player, PlayerCreateRequest req) {
+        player.setFullName(req.fullName());
+        player.setDateOfBirth(req.dateOfBirth());
+        player.setJerseyNumber(req.jerseyNumber());
+        player.setPosition(req.position());
+        player.setPhone(req.phone());
+        player.setEmail(req.email());
+        player.setDepartment(req.department());
+        player.setNotes(req.notes());
+        if (req.active() != null) player.setActive(req.active());
+    }
+
+    /** Unified player profile: contact info, department, sports, and captaincy status. */
+    public PlayerProfileDTO getProfile(Long id) {
+        Player player = findById(id);
+
+        List<PlayerProfileDTO.SportInfo> sports = new ArrayList<>();
+        PlayerProfileDTO.SportInfo captainOf = null;
+        for (Sport sport : player.getSports()) {
+            PlayerProfileDTO.SportInfo info = new PlayerProfileDTO.SportInfo(sport.getId(), sport.getName());
+            sports.add(info);
+            if (captainOf == null && sport.hasCaptainByPlayerId(player.getId())) {
+                captainOf = info;
+            }
+        }
+
+        return new PlayerProfileDTO(
+                player.getId(),
+                player.getFullName(),
+                player.getEmail(),
+                player.getPhone(),
+                player.getDepartment(),
+                captainOf != null,
+                captainOf,
+                List.copyOf(sports)
+        );
     }
 
     @Transactional
@@ -70,24 +156,26 @@ public class PlayerService {
     @Transactional
     public void delete(Long id) {
         Player player = findById(id);
+        // Remove from any sports before deleting (clean up player_sports / sport_captains rows).
+        for (Sport sport : List.copyOf(player.getSports())) {
+            player.removeSport(sport);
+        }
         playerRepository.delete(player);
     }
 
     /**
-     * Promotes a player to captain: creates a User account (ROLE_CAPTAIN) using the
-     * admin-provided username and password and assigns them to the sport's captains list.
-     * An existing captain account is reused when the typed username (or the player's
-     * email, for previously auto-created accounts) already maps to a ROLE_CAPTAIN user;
-     * in that case the provided password is left untouched.
+     * Promotes a player to captain of a sport. Captaincy now attaches to the PLAYER directly
+     * (the {@code sport_captains} join table links to {@code players}), matching the V5 schema.
+     * For continuity, a ROLE_CAPTAIN {@code users} login account is still created/reused from
+     * the admin-provided username/password, linked to the player via the shared email, so the
+     * new captain can sign in. TODO (Phase 2): revisit whether captain login should be
+     * user-account based at all once the frontend supports player-based auth.
      */
     @Transactional
-    public User promoteToCaptain(Long playerId, String username, String rawPassword,
-                                 UserService userService, SportService sportService) {
+    public Player promoteToCaptain(Long playerId, Long sportId, String username, String rawPassword,
+                                   UserService userService) {
         Player player = findById(playerId);
-        Sport sport = player.getSport();
-        if (sport == null) {
-            throw new ResourceNotFoundException("Sport not found for player " + playerId);
-        }
+        sportService.findById(sportId); // validate the sport exists before any account work
 
         String resolvedUsername = (username != null && !username.isBlank()) ? username.trim() : null;
 
@@ -98,8 +186,8 @@ public class PlayerService {
                 throw new IllegalStateException(
                         "Username \"" + resolvedUsername + "\" is taken by a non-captain user.");
             }
-            sportService.assignCaptain(sport.getId(), existing);
-            return existing;
+            sportService.assignCaptain(sportId, player);
+            return player;
         }
 
         // 2) Reuse a captain account previously created from this player's email
@@ -110,43 +198,86 @@ public class PlayerService {
                 throw new IllegalStateException(
                         "User with email " + player.getEmail() + " exists but is not a captain.");
             }
-            sportService.assignCaptain(sport.getId(), existing);
-            return existing;
+            sportService.assignCaptain(sportId, player);
+            return player;
         }
 
-        // 3) Create a brand-new captain account with the admin-provided credentials
+        // 3) Create a brand-new captain login account with the admin-provided credentials
         if (resolvedUsername == null) {
             throw new IllegalArgumentException("A username is required to create the new captain account.");
         }
         if (rawPassword == null || rawPassword.isBlank()) {
             throw new IllegalArgumentException("A password is required to create the new captain account.");
         }
-        User captain = userService.createUser(
+        userService.createUser(
                 resolvedUsername, rawPassword,
                 player.getFullName(), player.getEmail(), player.getPhone(),
                 User.Role.ROLE_CAPTAIN
         );
-        sportService.assignCaptain(sport.getId(), captain);
-        return captain;
+        sportService.assignCaptain(sportId, player);
+        return player;
     }
 
     /**
-     * Removes the player's associated user from the sport's captains list.
-     * The User account itself is NOT deleted.
+     * Removes the player from the sport's captains list (player-centric captaincy).
+     * The User login account, if any, is NOT deleted.
      */
     @Transactional
-    public void demoteFromCaptain(Long playerId, SportService sportService, UserService userService) {
+    public void demoteFromCaptain(Long playerId, Long sportId) {
         Player player = findById(playerId);
-        Sport sport = player.getSport();
-        if (sport == null) {
-            throw new ResourceNotFoundException("Sport not found for player " + playerId);
-        }
+        sportService.removeCaptain(sportId, player.getId());
+    }
 
-        // The captain User is linked to the Player via email.
-        if (player.getEmail() == null || player.getEmail().isBlank()) {
-            throw new IllegalStateException("Player " + playerId + " has no email; cannot resolve captain account.");
-        }
-        User captain = userService.findUserByEmail(player.getEmail());
-        sportService.removeCaptain(sport.getId(), captain.getId());
+    // ------------------------------------------------------------------
+    // Interim authorization bridges (captain = Player, login = User).
+    // Phase 2 should replace these once player-based auth is in place.
+    // ------------------------------------------------------------------
+
+    /**
+     * Sports the given user captains, resolved through their player record (email bridge).
+     * Admins see all active sports.
+     */
+    public List<Sport> findCaptainSports(User user) {
+        if (user == null) return List.of();
+        if (user.getRole() == User.Role.ROLE_ADMIN) return sportService.findAllActive();
+        return findByEmail(user.getEmail())
+                .map(p -> sportService.findByCaptainId(p.getId()))
+                .orElse(List.of());
+    }
+
+    /**
+     * Is this user a captain (or admin) of the given sport?
+     */
+    public boolean isCaptain(User user, Long sportId) {
+        if (user == null) return false;
+        if (user.getRole() == User.Role.ROLE_ADMIN) return true;
+        return findByEmail(user.getEmail())
+                .map(p -> sportService.isCaptain(sportId, p.getId()))
+                .orElse(false);
+    }
+
+    /**
+     * Is this user a captain (or admin) of the given sport object?
+     */
+    public boolean isCaptainOfSport(User user, Sport sport) {
+        if (user == null) return false;
+        if (user.getRole() == User.Role.ROLE_ADMIN) return true;
+        if (sport == null) return false;
+        return findByEmail(user.getEmail())
+                .map(p -> sport.hasCaptainByPlayerId(p.getId()))
+                .orElse(false);
+    }
+
+    /**
+     * Can this user manage the given player? True for admins, or for a captain who captains at
+     * least one sport the player participates in. Interim rule — revisit in Phase 2.
+     */
+    public boolean canManage(User user, Player target) {
+        if (user == null) return false;
+        if (user.getRole() == User.Role.ROLE_ADMIN) return true;
+        Long myPlayerId = findByEmail(user.getEmail()).map(Player::getId).orElse(null);
+        if (myPlayerId == null || target == null) return false;
+        return target.getSports().stream()
+                .anyMatch(s -> s.hasCaptainByPlayerId(myPlayerId));
     }
 }

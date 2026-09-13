@@ -18,11 +18,11 @@ public interface SportRepository extends JpaRepository<Sport, Long> {
     @Query("SELECT DISTINCT s FROM Sport s LEFT JOIN FETCH s.captains WHERE s.active = true ORDER BY s.name ASC")
     List<Sport> findByActiveTrue();
 
+    /**
+     * Sports where the given PLAYER is a captain. (Captains are players, not users.)
+     */
     @Query("SELECT DISTINCT s FROM Sport s JOIN FETCH s.captains c WHERE c.id = :captainId ORDER BY s.name ASC")
     List<Sport> findByCaptainId(@Param("captainId") Long captainId);
-
-    @Query("SELECT DISTINCT s FROM Sport s JOIN FETCH s.captains c WHERE c.username = :username ORDER BY s.name ASC")
-    List<Sport> findByCaptainUsername(@Param("username") String username);
 
     @Query("SELECT DISTINCT s FROM Sport s LEFT JOIN FETCH s.captains WHERE s.id = :id")
     Optional<Sport> findByIdWithCaptains(@Param("id") Long id);

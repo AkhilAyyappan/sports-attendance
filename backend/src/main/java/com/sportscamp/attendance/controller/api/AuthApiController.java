@@ -2,7 +2,7 @@ package com.sportscamp.attendance.controller.api;
 
 import com.sportscamp.attendance.entity.Sport;
 import com.sportscamp.attendance.entity.User;
-import com.sportscamp.attendance.service.SportService;
+import com.sportscamp.attendance.service.PlayerService;
 import com.sportscamp.attendance.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -21,7 +21,7 @@ import java.util.Map;
 public class AuthApiController {
 
     private final UserService userService;
-    private final SportService sportService;
+    private final PlayerService playerService;
 
     @GetMapping("/me")
     public ResponseEntity<Map<String, Object>> getCurrentUser(Authentication auth) {
@@ -40,7 +40,7 @@ public class AuthApiController {
         result.put("enabled", user.isEnabled());
 
         if (user.getRole() == User.Role.ROLE_CAPTAIN) {
-            List<Sport> sports = sportService.findByCaptainId(user.getId());
+            List<Sport> sports = playerService.findCaptainSports(user);
             List<Map<String, Object>> sportsList = sports.stream()
                     .map(s -> Map.<String, Object>of("id", s.getId(), "name", s.getName()))
                     .toList();

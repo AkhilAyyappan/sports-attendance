@@ -1,3 +1,9 @@
+/** Minimal sport reference used on players, profiles, and sessions. */
+export interface SportLite {
+  id: number
+  name: string
+}
+
 export interface CaptainLite {
   id: number
   username: string

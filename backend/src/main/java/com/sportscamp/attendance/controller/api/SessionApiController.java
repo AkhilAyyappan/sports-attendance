@@ -3,7 +3,7 @@ package com.sportscamp.attendance.controller.api;
 import com.sportscamp.attendance.entity.Sport;
 import com.sportscamp.attendance.entity.TrainingSession;
 import com.sportscamp.attendance.entity.User;
-import com.sportscamp.attendance.service.SportService;
+import com.sportscamp.attendance.service.PlayerService;
 import com.sportscamp.attendance.service.TrainingSessionService;
 import com.sportscamp.attendance.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -25,18 +25,14 @@ public class SessionApiController {
 
     private final TrainingSessionService sessionService;
     private final UserService userService;
-    private final SportService sportService;
+    private final PlayerService playerService;
 
     private boolean isCaptainOfSport(User user, Long sportId) {
-        if (user.getRole() == User.Role.ROLE_ADMIN) return true;
-        Sport sport = sportService.findById(sportId);
-        return sport.hasCaptain(user);
+        return playerService.isCaptain(user, sportId);
     }
 
     private boolean isCaptainOfSession(User user, TrainingSession session) {
-        if (user.getRole() == User.Role.ROLE_ADMIN) return true;
-        if (session.getSport() == null) return false;
-        return session.getSport().hasCaptain(user);
+        return playerService.isCaptainOfSport(user, session.getSport());
     }
 
     /** GET /api/sessions — all sessions (scoped to captain's assigned sports if captain) */
@@ -45,7 +41,7 @@ public class SessionApiController {
         if (auth != null && auth.isAuthenticated()) {
             User me = userService.findByUsername(auth.getName());
             if (me.getRole() == User.Role.ROLE_CAPTAIN) {
-                List<Sport> mySports = sportService.findByCaptainId(me.getId());
+                List<Sport> mySports = playerService.findCaptainSports(me);
                 List<TrainingSession> result = new ArrayList<>();
                 for (Sport sport : mySports) {
                     result.addAll(sessionService.findBySport(sport.getId()));
@@ -156,4 +152,3 @@ public class SessionApiController {
         return s;
     }
 }
-

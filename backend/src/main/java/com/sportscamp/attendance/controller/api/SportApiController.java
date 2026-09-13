@@ -1,14 +1,19 @@
 package com.sportscamp.attendance.controller.api;
 
+import com.sportscamp.attendance.dto.SportOverviewDTO;
+import com.sportscamp.attendance.entity.Player;
 import com.sportscamp.attendance.entity.Sport;
 import com.sportscamp.attendance.entity.User;
 import com.sportscamp.attendance.exception.DuplicateResourceException;
 import com.sportscamp.attendance.exception.ResourceNotFoundException;
+import com.sportscamp.attendance.service.PlayerService;
 import com.sportscamp.attendance.service.SportService;
 import com.sportscamp.attendance.service.UserService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -23,6 +28,7 @@ public class SportApiController {
 
     private final SportService sportService;
     private final UserService userService;
+    private final PlayerService playerService;
 
     @GetMapping
     public List<Sport> listAll() {
@@ -34,6 +40,13 @@ public class SportApiController {
         return sportService.findAllActive();
     }
 
+    /** GET /api/sports/overview — admin dashboard: active sports, roster counts, and their captains */
+    @GetMapping("/overview")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public List<SportOverviewDTO> overview() {
+        return sportService.getOverview();
+    }
+
     /** GET /api/sports/my — returns sports assigned to the logged in captain, or all for admin */
     @GetMapping("/my")
     public List<Sport> listMySports(Authentication auth) {
@@ -41,10 +54,7 @@ public class SportApiController {
             return List.of();
         }
         User user = userService.findByUsername(auth.getName());
-        if (user.getRole() == User.Role.ROLE_ADMIN) {
-            return sportService.findAllActive();
-        }
-        return sportService.findByCaptainId(user.getId());
+        return playerService.findCaptainSports(user);
     }
 
     @GetMapping("/{id}")
@@ -52,12 +62,8 @@ public class SportApiController {
         Sport sport = sportService.findById(id);
         if (auth != null && auth.isAuthenticated()) {
             User user = userService.findByUsername(auth.getName());
-            if (user.getRole() == User.Role.ROLE_CAPTAIN) {
-                boolean isCaptain = sport.getCaptains().stream()
-                        .anyMatch(c -> c.getId().equals(user.getId()));
-                if (!isCaptain) {
-                    return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-                }
+            if (user.getRole() == User.Role.ROLE_CAPTAIN && !playerService.isCaptainOfSport(user, sport)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
             }
         }
         return ResponseEntity.ok(sport);
@@ -101,7 +107,8 @@ public class SportApiController {
 
     /**
      * POST /api/sports/{id}/captain  body: {"captainId": 2}
-     * Adds one captain to the sport. Fails if the sport already has 3 captains.
+     * Adds one player-captain to the sport (captainId is a PLAYER id). Fails if the sport
+     * already has 3 captains, or if the player already captains another sport.
      */
     @PostMapping("/{id}/captain")
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
@@ -110,8 +117,8 @@ public class SportApiController {
             return ResponseEntity.badRequest().body(Map.of("message", "Captain ID is required"));
         }
         try {
-            Long captainId = Long.valueOf(body.get("captainId").toString());
-            User captain = userService.findById(captainId);
+            Long captainPlayerId = Long.valueOf(body.get("captainId").toString());
+            Player captain = playerService.findById(captainPlayerId);
             Sport sport = sportService.assignCaptain(id, captain);
             return ResponseEntity.ok(sport);
         } catch (ResourceNotFoundException e) {
@@ -125,7 +132,7 @@ public class SportApiController {
 
     /**
      * DELETE /api/sports/{id}/captain/{captainId}
-     * Removes one captain from the sport.
+     * Removes one captain (player id) from the sport.
      */
     @DeleteMapping("/{id}/captain/{captainId}")
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
@@ -136,6 +143,42 @@ public class SportApiController {
         } catch (ResourceNotFoundException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", e.getMessage()));
         }
+    }
+
+    /**
+     * POST /api/sports/{sportId}/captains/{playerId}
+     * Promotes a player to captain of a sport. Allowed for admins and the sport's existing
+     * captains. A player may captain at most one sport — promoting one who already captains
+     * another sport yields a 400 Bad Request.
+     */
+    @PostMapping("/{sportId}/captains/{playerId}")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_CAPTAIN')")
+    public ResponseEntity<?> promotePlayerToCaptain(@PathVariable Long sportId,
+                                                    @PathVariable Long playerId,
+                                                    Authentication auth) {
+        User me = userService.findByUsername(auth.getName());
+        if (!playerService.isCaptain(me, sportId)) {
+            throw new AccessDeniedException("You are not authorized to manage captains for this sport.");
+        }
+        Player player = playerService.findById(playerId);
+        boolean memberOfSport = player.getSports().stream().anyMatch(s -> s.getId().equals(sportId));
+        if (!memberOfSport) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("message", "Player is not part of this sport."));
+        }
+        try {
+            sportService.assignCaptain(sportId, player);
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        } catch (DataIntegrityViolationException e) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("message", "A player may be captain of at most one sport."));
+        }
+        return ResponseEntity.ok(Map.of(
+                "sportId", sportId,
+                "playerId", playerId,
+                "message", "Player promoted to captain."
+        ));
     }
 
     /** DELETE /api/sports/{id} */

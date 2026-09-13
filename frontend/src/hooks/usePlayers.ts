@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/api/client'
-import { type Player } from '@/types'
+import { type Player, type PlayerPayload, type PlayerProfile } from '@/types'
 
 export function usePlayers(sportId: number) {
   return useQuery({
@@ -25,23 +25,39 @@ export function usePlayer(id: number) {
   })
 }
 
+/** GET /api/players/{id}/profile — unified profile (contact, department, sports, captaincy). */
+export function usePlayerProfile(id: number) {
+  return useQuery({
+    queryKey: ['players', id, 'profile'],
+    queryFn: () => api.get(`/api/players/${id}/profile`).then((r) => r.data as PlayerProfile),
+    enabled: id > 0,
+  })
+}
+
 export function useAddPlayer() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ sportId, data }: { sportId: number; data: Partial<Player> }) =>
-      api.post(`/api/sports/${sportId}/players`, data),
-    onSuccess: (_data, variables) =>
-      qc.invalidateQueries({ queryKey: ['sports', variables.sportId, 'players'] }),
+    // Posts to the global create endpoint so sportIds in the payload are the source of
+    // truth (no unchecked-path-sport merge). sportId is retained only as a cache-invalidation
+    // hint (the selected roster), so it may be null when registering outside a sport context.
+    mutationFn: (vars: { sportId: number | null; data: PlayerPayload }) =>
+      api.post(`/api/players`, vars.data),
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: ['sports', variables.sportId, 'players'] })
+      qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'players' })
+    },
   })
 }
 
 export function useUpdatePlayer() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<Player> }) =>
+    mutationFn: ({ id, data }: { id: number; data: PlayerPayload }) =>
       api.put(`/api/players/${id}`, data),
-    onSuccess: () =>
-      qc.invalidateQueries({ predicate: (q) => q.queryKey.includes('players') }),
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ predicate: (q) => q.queryKey.includes('players') })
+      qc.invalidateQueries({ queryKey: ['sports', variables.id, 'players'] })
+    },
   })
 }
 

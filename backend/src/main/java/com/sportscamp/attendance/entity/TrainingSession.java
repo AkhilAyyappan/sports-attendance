@@ -49,7 +49,7 @@ public class TrainingSession extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "sport_id", nullable = false)
-    @JsonIgnoreProperties({"players","trainingSessions","captain","hibernateLazyInitializer"})
+    @JsonIgnoreProperties({"players","captains","trainingSessions","captain","hibernateLazyInitializer"})
     private Sport sport;
 
     @JsonIgnore

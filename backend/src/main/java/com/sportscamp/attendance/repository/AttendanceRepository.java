@@ -24,7 +24,8 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
 
     @Query("""
             SELECT a FROM Attendance a
-            WHERE a.player.sport.id = :sportId
+            JOIN a.player p JOIN p.sports sp
+            WHERE sp.id = :sportId
               AND a.session.id = :sessionId
             """)
     List<Attendance> findBySportIdAndSessionId(
@@ -42,7 +43,8 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
 
     @Query("""
             SELECT COUNT(a) FROM Attendance a
-            WHERE a.player.sport.id = :sportId
+            JOIN a.player p JOIN p.sports sp
+            WHERE sp.id = :sportId
               AND a.status = 'PRESENT'
             """)
     long countPresentBySport(
