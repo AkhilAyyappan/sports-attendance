@@ -40,6 +40,15 @@ public class Sport extends BaseEntity {
     private boolean active = true;
 
     /**
+     * Whether a date query with no configured sessions may auto-create the default
+     * Morning/Evening slots. Switched off automatically once the last session of a day is
+     * deleted, so an emptied schedule stays empty instead of re-creating deleted sessions.
+     */
+    @Column(name = "default_sessions_enabled", nullable = false)
+    @Builder.Default
+    private boolean defaultSessionsEnabled = true;
+
+    /**
      * Player-captains for this sport (owning side of the {@code sport_captains} join table).
      * A sport has up to 3 captains; the same player may captain several sports.
      */

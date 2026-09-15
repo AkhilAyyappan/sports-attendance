@@ -58,13 +58,16 @@ export default function LoginPage() {
       {/* Left panel — branding */}
       <div className="hidden lg:flex lg:w-1/2 bg-brand-900 flex-col justify-center px-16">
         <img
-          src="/clg-logo-white.png"
+          src="/nss_sports_logo.png"
           alt="NSS Sports Camp"
-          className="h-28 w-28 object-contain mb-8"
+          className="h-36 w-36 object-contain mb-8 self-center"
         />
-        <h1 className="font-display text-4xl font-bold text-white leading-tight mb-4">
-          University Athletics
-        </h1>
+        <div className="flex items-center gap-3 mb-4">
+          <img src="/clg-logo-white.png" alt="NSS Sports Camp" className="h-10 w-10 object-contain" />
+          <h1 className="font-display text-4xl font-bold text-white leading-tight">
+            University Athletics
+          </h1>
+        </div>
         <p className="font-sans text-brand-700 text-lg leading-relaxed">
           Sports Camp Attendance System
         </p>

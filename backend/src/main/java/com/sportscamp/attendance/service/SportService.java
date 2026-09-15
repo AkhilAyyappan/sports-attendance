@@ -58,6 +58,14 @@ public class SportService {
         return sportRepository.save(existing);
     }
 
+    /** Disable (or re-enable) auto-creation of default Morning/Evening sessions for a sport. */
+    @Transactional
+    public void setDefaultSessionsEnabled(Long sportId, boolean enabled) {
+        Sport sport = findById(sportId);
+        sport.setDefaultSessionsEnabled(enabled);
+        sportRepository.save(sport);
+    }
+
     /**
      * Add a player as a captain of a sport. Fails if the sport already has
      * {@value #MAX_CAPTAINS_PER_SPORT} captains. A player may captain multiple sports.

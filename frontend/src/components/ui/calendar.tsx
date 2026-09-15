@@ -17,28 +17,28 @@ function Calendar({ className, classNames, components, showOutsideDays = true, .
       showOutsideDays={showOutsideDays}
       className={cn('p-3', className)}
       classNames={{
-        root: 'w-full',
+        root: 'w-full select-none',
         months: 'w-full',
         month: 'w-full',
-        month_caption: 'flex justify-center pt-1 relative items-center h-9',
+        month_caption: 'hidden',
         hidden: 'invisible',
-        caption_label: 'font-display text-sm font-semibold text-brand-900',
+        caption_label: 'hidden',
         nav: 'space-x-1 flex items-center z-10',
         button_previous: cn(buttonVariants({ variant: 'ghost' }), 'h-7 w-7 p-0 opacity-70 hover:opacity-100 absolute left-1'),
         button_next: cn(buttonVariants({ variant: 'ghost' }), 'h-7 w-7 p-0 opacity-70 hover:opacity-100 absolute right-1'),
         month_grid: 'w-full border-collapse space-y-1',
-        weekdays: 'flex',
-        weekday: 'w-9 font-mono text-[0.7rem] font-medium uppercase text-slate-400',
-        week: 'flex w-full mt-0.5',
-        day: 'h-9 w-9 text-center text-sm p-0 relative focus-within:relative focus-within:z-20',
+        weekdays: 'flex justify-between mb-1',
+        weekday: 'flex-1 text-center font-mono text-[0.7rem] font-semibold uppercase tracking-wider text-muted-foreground',
+        week: 'flex w-full items-center justify-between',
+        day: 'flex flex-1 items-center justify-center py-0.5',
         day_button: cn(
           buttonVariants({ variant: 'ghost' }),
-          'h-9 w-9 p-0 font-normal aria-selected:opacity-100'
+          'h-8 w-8 p-0 text-sm font-normal aria-selected:opacity-100'
         ),
         selected: 'bg-accent text-white hover:bg-accent-light shadow-sm',
         today: 'ring-1 ring-inset ring-accent ring-offset-0',
-        outside: 'day-outside text-slate-300 opacity-60',
-        disabled: 'text-slate-300 opacity-50',
+        outside: 'day-outside text-muted-foreground/40 opacity-60',
+        disabled: 'text-muted-foreground/40 opacity-50',
         ...classNames,
       }}
       components={{

@@ -386,7 +386,7 @@ export default function RosterPage() {
             <Table className="ledger-table w-full card-table">
               <TableHeader>
                 <TableRow className="bg-muted/50 border-b border-border">
-                  <TableHead className="w-16 font-display text-foreground font-semibold min-w-[50px]">#</TableHead>
+                  <TableHead className="w-16 font-display text-foreground font-semibold min-w-[50px]">Jersey</TableHead>
                   <TableHead className="font-display text-foreground font-semibold min-w-[160px]">Athlete Name</TableHead>
                   <TableHead className="font-display text-foreground font-semibold min-w-[120px]">Position / Role</TableHead>
                   <TableHead className="font-display text-foreground font-semibold min-w-[140px]">Contact</TableHead>
@@ -401,14 +401,14 @@ export default function RosterPage() {
                     className="hover:bg-muted/40 transition-colors cursor-pointer"
                     onClick={() => setSelectedPlayer(player)}
                   >
-                    <TableCell data-label="#" className="font-mono text-xs font-semibold text-foreground">
-                      {player.jerseyNumber ? `#${player.jerseyNumber}` : '—'}
+                    <TableCell data-label="Jersey" className="font-mono text-xs font-semibold text-foreground">
+                      {player.jerseyNumber ?? '—'}
                     </TableCell>
                     <TableCell data-label="Athlete Name">
                       <div className="font-display font-bold text-foreground text-sm">{player.fullName}</div>
                       {player.notes && <div className="text-xs text-muted-foreground truncate max-w-xs">{player.notes}</div>}
                     </TableCell>
-                    <TableCell data-label="Position" className="font-sans text-xs text-muted-foreground font-medium">
+                    <TableCell data-label="Position / Role" className="font-sans text-xs text-muted-foreground font-medium">
                       {player.position || '—'}
                     </TableCell>
                     <TableCell data-label="Contact" className="font-sans text-xs text-muted-foreground">

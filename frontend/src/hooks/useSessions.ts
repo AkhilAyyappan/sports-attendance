@@ -81,7 +81,9 @@ export function useDeleteSession() {
     mutationFn: (id: number) => api.delete(`/api/sessions/${id}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['sessions'] })
-      qc.invalidateQueries({ predicate: (q) => q.queryKey.includes('sessions') })
+      qc.invalidateQueries({
+        predicate: (q) => q.queryKey[0] === 'sports' && q.queryKey[2] === 'sessions',
+      })
     },
   })
 }

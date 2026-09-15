@@ -33,9 +33,9 @@ public class TrainingSessionService {
      */
     @Transactional
     public List<TrainingSession> findBySportAndDate(Long sportId, LocalDate date) {
-        sportService.findById(sportId);
+        Sport sport = sportService.findById(sportId);
         List<TrainingSession> existing = sessionRepository.findBySportIdAndSessionDate(sportId, date);
-        if (existing.isEmpty()) {
+        if (existing.isEmpty() && sport.isDefaultSessionsEnabled()) {
             createForSport(defaultSession(date, MORNING_TITLE_SUFFIX, LocalTime.of(7, 0), LocalTime.of(9, 0)), sportId);
             createForSport(defaultSession(date, EVENING_TITLE_SUFFIX, LocalTime.of(16, 30), LocalTime.of(18, 30)), sportId);
         }
@@ -95,6 +95,12 @@ public class TrainingSessionService {
     @Transactional
     public void delete(Long id) {
         TrainingSession session = findById(id);
+        Long sportId = session.getSport().getId();
+        LocalDate date = session.getSessionDate();
         sessionRepository.delete(session);
+        sessionRepository.flush();
+        if (sessionRepository.findBySportIdAndSessionDate(sportId, date).isEmpty()) {
+            sportService.setDefaultSessionsEnabled(sportId, false);
+        }
     }
 }

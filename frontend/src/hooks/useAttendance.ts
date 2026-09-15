@@ -14,6 +14,7 @@ export function useAttendance(sessionId: number) {
         .get(`/api/sessions/${sessionId}/attendance`)
         .then((r) => r.data as AttendanceRecord[]),
     enabled: sessionId > 0,
+    retry: 1,
   })
 }
 

@@ -102,11 +102,13 @@ export default function AttendancePage() {
   }).format(parseISOLocal(selectedDate))
 
   const handleDelete = async () => {
-    if (!deleteDialog.session) return
+    if (!deleteDialog.session || deleteSession.isPending) return
+    const target = deleteDialog.session
     try {
-      await deleteSession.mutateAsync(deleteDialog.session.id)
-      toast.success(`Session "${deleteDialog.session.title}" deleted.`)
+      await deleteSession.mutateAsync(target.id)
+      toast.success(`Session "${target.title}" deleted.`)
       setDeleteDialog({ open: false, session: null })
+      setRegisterSession((cur) => (cur?.id === target.id ? null : cur))
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to delete session.')
     }
@@ -289,9 +291,10 @@ export default function AttendancePage() {
             <Button
               type="button"
               onClick={handleDelete}
+              disabled={deleteSession.isPending}
               className="w-full sm:w-auto bg-destructive hover:bg-destructive/90 text-destructive-foreground font-medium"
             >
-              Confirm Delete
+              {deleteSession.isPending ? 'Deleting…' : 'Confirm Delete'}
             </Button>
           </DialogFooter>
         </DialogContent>
